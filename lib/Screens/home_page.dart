@@ -54,20 +54,19 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = theme.colorScheme.background;
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Money Manager'),
         centerTitle: true,
         elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade700, Colors.blue.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -75,97 +74,112 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      drawer: _buildDrawer(context),
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.blue.shade50.withOpacity(0.3),
-                  Colors.white,
-                ],
-              ),
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeHeader(),
-                  const SizedBox(height: 24),
-                  _buildQuickStatsRow(),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader('Financial Tools'),
-                  const SizedBox(height: 16),
-                  _buildFinancialToolsGrid(context),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader('Recent Activity'),
-                  const SizedBox(height: 16),
-                  _buildRecentActivityList(),
-                ],
-              ),
-            ),
+      drawer: _buildDrawer(context, theme),
+      body: Container(
+        color: bgColor,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeHeader(theme, textColor),
+              const SizedBox(height: 24),
+              _buildQuickStatsRow(theme, cardColor, textColor, isDark),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Financial Tools', theme, textColor),
+              const SizedBox(height: 16),
+              _buildFinancialToolsGrid(context, theme, cardColor, textColor, isDark),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Recent Activity', theme, textColor),
+              const SizedBox(height: 16),
+              _buildRecentActivityList(theme, cardColor, textColor, isDark),
+            ],
           ),
-          // Currency button at bottom right
-          Positioned(
-            bottom: 90,
-            right: 24,
-            child: FloatingActionButton.small(
-              heroTag: 'currencyBtn',
-              backgroundColor: Colors.teal,
-              child: const Icon(Icons.currency_exchange),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const CurrencyDialog(),
-                );
-              },
-            ),
+        ),
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'currencyBtn',
+            backgroundColor: theme.colorScheme.secondary,
+            child: const Icon(Icons.currency_exchange),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const CurrencyDialog(),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () {},
+            child: const Icon(Icons.add),
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.blue,
       ),
     );
   }
 
-  Widget _buildDrawer(BuildContext context) {
+  Widget _buildDrawer(BuildContext context, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = theme.colorScheme.primary;
+    final onPrimary = theme.colorScheme.onPrimary;
+    final background = theme.colorScheme.background;
+
     return Drawer(
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue.shade100.withOpacity(0.3),
-              Colors.white,
-            ],
-          ),
-        ),
+        color: isDark ? theme.colorScheme.surface : background,
         child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              accountName: Text(user),
-              accountEmail: Text(email),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Text(
-                  user.isNotEmpty ? user[0].toUpperCase() : "?",
-                  style: const TextStyle(fontSize: 24),
+            // Drawer Header with improved contrast for dark mode
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(top: 40, bottom: 24),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? theme.colorScheme.primary.withOpacity(0.18)
+                    : theme.colorScheme.primary.withOpacity(0.12),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
                 ),
               ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade700, Colors.blue.shade400],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: primary,
+                    child: Text(
+                      user.isNotEmpty ? user[0].toUpperCase() : "?",
+                      style: TextStyle(
+                        fontSize: 28,
+                        color: onPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    user,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    email,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark
+                          ? Colors.white.withOpacity(0.7)
+                          : Colors.black54,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -177,12 +191,14 @@ class HomePage extends StatelessWidget {
                     Icons.person,
                     'Profile',
                     ProfilePage(user: user, email: email, phone: phone),
+                    theme,
                   ),
                   _buildDrawerItem(
                     context,
                     Icons.settings,
                     'Settings',
                     const SettingsPage(),
+                    theme,
                   ),
                   const Divider(),
                   _buildDrawerItem(
@@ -190,6 +206,7 @@ class HomePage extends StatelessWidget {
                     Icons.exit_to_app,
                     'Logout',
                     LoginPage(),
+                    theme,
                   ),
                 ],
               ),
@@ -205,43 +222,49 @@ class HomePage extends StatelessWidget {
     IconData icon,
     String title,
     Widget page,
+    ThemeData theme,
   ) {
+    final isDark = theme.brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, color: Colors.blue.shade700),
-      title: Text(title),
+      leading: Icon(icon, color: theme.colorScheme.primary),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isDark
+              ? theme.colorScheme.onSurface
+              : theme.textTheme.bodyLarge?.color,
+        ),
+      ),
       onTap: () {
         Navigator.pop(context);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => page),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
       },
     );
   }
 
-  Widget _buildWelcomeHeader() {
+  Widget _buildWelcomeHeader(ThemeData theme, Color textColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Welcome Back!',
-          style: const TextStyle(
-            fontSize: 24,
+          style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.blue.shade100,
+            color: theme.colorScheme.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             'Today is ${DateTime.now().toString().split(' ')[0]}',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.blue.shade800,
+              color: theme.colorScheme.primary,
             ),
           ),
         ),
@@ -249,115 +272,122 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickStatsRow() {
+  Widget _buildQuickStatsRow(
+      ThemeData theme, Color cardColor, Color textColor, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade600, Colors.blue.shade400],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+          if (!isDark)
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem('Total Balance', '\$2,450.00', Icons.account_balance),
-          _buildStatItem('Monthly Budget', '\$1,450.00', Icons.pie_chart),
-          _buildStatItem('Savings', '\$1000.00', Icons.savings),
+          _buildStatItem('Total Balance', '\$2,450.00', Icons.account_balance, theme),
+          _buildStatItem('Monthly Budget', '\$1,450.00', Icons.pie_chart, theme),
+          _buildStatItem('Savings', '\$1000.00', Icons.savings, theme),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon) {
+  Widget _buildStatItem(
+      String title, String value, IconData icon, ThemeData theme) {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: theme.colorScheme.primary.withOpacity(0.15),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, size: 20, color: Colors.white),
+          child: Icon(icon, size: 20, color: theme.colorScheme.primary),
         ),
         const SizedBox(height: 8),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.textTheme.bodySmall?.color,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
+          style: theme.textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: theme.colorScheme.primary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, ThemeData theme, Color textColor) {
     return Padding(
       padding: const EdgeInsets.only(left: 8.0),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 18,
+        style: theme.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.bold,
-          color: Colors.blue.shade800,
+          color: theme.colorScheme.primary,
         ),
       ),
     );
   }
 
-  Widget _buildFinancialToolsGrid(BuildContext context) {
+  Widget _buildFinancialToolsGrid(BuildContext context, ThemeData theme,
+      Color cardColor, Color textColor, bool isDark) {
+    // Make the icons and text larger and more readable
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      crossAxisSpacing: 24,
+      mainAxisSpacing: 24,
+      childAspectRatio: 1.2,
       children: [
         _buildToolCard(
           context,
           'Expenses Tracker',
-          Icons.receipt,
-          [Colors.red.shade100, Colors.red.shade50],
+          Icons.receipt_long,
+          theme,
+          cardColor,
+          textColor,
           const ExpensesPage(),
         ),
         _buildToolCard(
           context,
           'Budget Planner',
           Icons.pie_chart,
-          [Colors.green.shade100, Colors.green.shade50],
+          theme,
+          cardColor,
+          textColor,
           const BudgetPage(),
         ),
         _buildToolCard(
           context,
           'Savings Goals',
           Icons.savings,
-          [Colors.blue.shade100, Colors.blue.shade50],
+          theme,
+          cardColor,
+          textColor,
           const SavingsGoalPage(),
         ),
         _buildToolCard(
           context,
           'Spending Analysis',
           Icons.analytics,
-          [Colors.purple.shade100, Colors.purple.shade50],
+          theme,
+          cardColor,
+          textColor,
           const SpendingAnalysisPage(),
         ),
       ],
@@ -368,11 +398,14 @@ class HomePage extends StatelessWidget {
     BuildContext context,
     String title,
     IconData icon,
-    List<Color> colors,
+    ThemeData theme,
+    Color cardColor,
+    Color textColor,
     Widget page,
   ) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      color: cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -384,59 +417,54 @@ class HomePage extends StatelessWidget {
             MaterialPageRoute(builder: (_) => page),
           );
         },
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: colors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 24, color: Colors.blue.shade700),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
-                  ),
-                  textAlign: TextAlign.center,
+                child: Icon(
+                  icon,
+                  size: 48, // Larger icon
+                  color: theme.colorScheme.primary,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18, // Larger text
+                  color: textColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRecentActivityList() {
+  Widget _buildRecentActivityList(
+      ThemeData theme, Color cardColor, Color textColor, bool isDark) {
     final recentTransactions = [
       {'name': 'Grocery Store', 'amount': '-\$85.20', 'time': 'Today, 10:30 AM'},
-      {'name': 'Salary Deposit', 'amount': '+\$2,500.00', 'time': 'Yesterday'},
-      {'name': 'Electric Bill', 'amount': '-\$120.50', 'time': '2 days ago'},
-      {'name': 'Coffee Shop', 'amount': '-\$4.75', 'time': '3 days ago'},
+      {'name': 'Salary', 'amount': '+\$2,000.00', 'time': 'Yesterday, 09:00 AM'},
+      {'name': 'Netflix', 'amount': '-\$17.99', 'time': 'Yesterday, 08:00 PM'},
+      {'name': 'Bus Ticket', 'amount': '-\$2.50', 'time': '2 days ago, 07:45 AM'},
     ];
 
     return Column(
       children: recentTransactions.map((transaction) {
+        final isIncome = transaction['amount']!.startsWith('+');
         return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          elevation: 2,
+          color: cardColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -444,38 +472,35 @@ class HomePage extends StatelessWidget {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: transaction['amount']!.startsWith('+')
-                    ? Colors.green.shade50
-                    : Colors.red.shade50,
+                color: isIncome
+                    ? Colors.green.withOpacity(0.15)
+                    : Colors.red.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                transaction['amount']!.startsWith('+')
-                    ? Icons.arrow_upward
-                    : Icons.arrow_downward,
-                color: transaction['amount']!.startsWith('+')
-                    ? Colors.green
-                    : Colors.red,
+                isIncome ? Icons.arrow_upward : Icons.arrow_downward,
+                color: isIncome ? Colors.green : Colors.red,
               ),
             ),
             title: Text(
               transaction['name']!,
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade800,
+                color: textColor,
               ),
             ),
             subtitle: Text(
               transaction['time']!,
-              style: TextStyle(color: Colors.grey.shade600),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
             ),
             trailing: Text(
               transaction['amount']!,
               style: TextStyle(
-                color: transaction['amount']!.startsWith('+')
-                    ? Colors.green
-                    : Colors.red,
+                color: isIncome ? Colors.green : Colors.red,
                 fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
           ),
@@ -494,59 +519,57 @@ class CurrencyDialog extends StatefulWidget {
 }
 
 class _CurrencyDialogState extends State<CurrencyDialog> {
-  final List<String> currencies = [
-    'USD', 'MYR', 'EUR', 'GBP', 'JPY', 'SGD', 'AUD', 'CNY', 'INR'
-  ];
-  final Map<String, String> currencySymbols = {
-    'USD': '\$', 'MYR': 'RM', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'SGD': '\$', 'AUD': '\$', 'CNY': '¥', 'INR': '₹'
-  };
-  String from = 'MYR';
-  String to = 'USD';
+  final amountController = TextEditingController();
+  String from = 'USD';
+  String to = 'MYR';
   double? rate;
+  double amount = 0;
   bool loading = false;
   String? error;
-  final amountController = TextEditingController(text: "1.0");
-  double amount = 1.0;
 
-  Future<void> fetchRate() async {
+  final Map<String, String> symbols = {
+    'USD': '\$',
+    'MYR': 'RM',
+    'EUR': '€',
+    'SGD': 'S\$',
+    'JPY': '¥',
+  };
+
+  Future<void> _convert() async {
     setState(() {
       loading = true;
       error = null;
       rate = null;
     });
     try {
-      final response = await http.get(
-        Uri.parse('https://open.er-api.com/v6/latest/$from'),
-      );
+      final response = await http.get(Uri.parse(
+          'https://api.exchangerate-api.com/v4/latest/$from'));
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          rate = (data['rates'][to] as num?)?.toDouble();
-          loading = false;
-        });
+        final data = jsonDecode(response.body);
+        final rates = data['rates'] as Map<String, dynamic>;
+        if (rates.containsKey(to)) {
+          setState(() {
+            rate = (rates[to] as num).toDouble();
+          });
+        } else {
+          setState(() {
+            error = 'Currency not supported';
+          });
+        }
       } else {
         setState(() {
           error = 'Failed to fetch rate';
-          loading = false;
         });
       }
     } catch (e) {
       setState(() {
         error = 'Error: $e';
+      });
+    } finally {
+      setState(() {
         loading = false;
       });
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    fetchRate();
-    amountController.addListener(() {
-      setState(() {
-        amount = double.tryParse(amountController.text) ?? 1.0;
-      });
-    });
   }
 
   @override
@@ -557,76 +580,44 @@ class _CurrencyDialogState extends State<CurrencyDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final fromSymbol = currencySymbols[from] ?? '';
-    final toSymbol = currencySymbols[to] ?? '';
-
+    final fromSymbol = symbols[from] ?? '';
+    final toSymbol = symbols[to] ?? '';
     return AlertDialog(
       title: const Text('Currency Converter'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Currency icon row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: currencies.map((c) {
-              return IconButton(
-                icon: Text(
-                  currencySymbols[c] ?? c,
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: c == from ? Colors.teal : Colors.grey,
-                  ),
-                ),
-                tooltip: c,
-                onPressed: () {
-                  setState(() {
-                    from = c;
-                  });
-                  fetchRate();
-                },
-              );
-            }).toList(),
-          ),
           Row(
             children: [
               Expanded(
-                child: DropdownButton<String>(
+                child: DropdownButtonFormField<String>(
                   value: from,
-                  isExpanded: true,
-                  items: currencies
+                  items: symbols.keys
                       .map((c) => DropdownMenuItem(
                             value: c,
-                            child: Text('$c (${currencySymbols[c] ?? ''})'),
+                            child: Text(c),
                           ))
                       .toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      from = v!;
-                    });
-                    fetchRate();
+                  onChanged: (val) {
+                    setState(() => from = val!);
                   },
+                  decoration: const InputDecoration(labelText: 'From'),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                child: Icon(Icons.swap_horiz),
-              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: DropdownButton<String>(
+                child: DropdownButtonFormField<String>(
                   value: to,
-                  isExpanded: true,
-                  items: currencies
+                  items: symbols.keys
                       .map((c) => DropdownMenuItem(
                             value: c,
-                            child: Text('$c (${currencySymbols[c] ?? ''})'),
+                            child: Text(c),
                           ))
                       .toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      to = v!;
-                    });
-                    fetchRate();
+                  onChanged: (val) {
+                    setState(() => to = val!);
                   },
+                  decoration: const InputDecoration(labelText: 'To'),
                 ),
               ),
             ],
@@ -640,6 +631,11 @@ class _CurrencyDialogState extends State<CurrencyDialog> {
               prefixText: fromSymbol,
               border: const OutlineInputBorder(),
             ),
+            onChanged: (val) {
+              setState(() {
+                amount = double.tryParse(val) ?? 0;
+              });
+            },
           ),
           const SizedBox(height: 16),
           loading
@@ -659,6 +655,10 @@ class _CurrencyDialogState extends State<CurrencyDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Close'),
+        ),
+        ElevatedButton(
+          onPressed: loading ? null : _convert,
+          child: const Text('Convert'),
         ),
       ],
     );

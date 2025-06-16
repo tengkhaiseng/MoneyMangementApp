@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class SavingsGoalPage extends StatefulWidget {
   const SavingsGoalPage({super.key});
@@ -15,6 +17,27 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
   DateTime? selectedDate;
 
   List<Map<String, dynamic>> savingsHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavings();
+  }
+
+  Future<void> _loadSavings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = prefs.getString('savings_history');
+    if (historyJson != null) {
+      setState(() {
+        savingsHistory = List<Map<String, dynamic>>.from(jsonDecode(historyJson));
+      });
+    }
+  }
+
+  Future<void> _saveSavings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('savings_history', jsonEncode(savingsHistory));
+  }
 
   double getSavingsProgress() {
     double goalAmount = double.tryParse(goalController.text) ?? 1.0;
@@ -33,13 +56,12 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
           "date": selectedDate != null ? selectedDate!.toLocal().toString().split(' ')[0] : "No Date Set",
         });
       });
-      // Clear the input fields after saving
+      _saveSavings();
       titleController.clear();
       goalController.clear();
       savedController.clear();
       selectedDate = null;
 
-      // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Progress saved successfully!'),
@@ -47,7 +69,6 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
         ),
       );
     } else {
-      // Show an error message if fields are empty
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all required fields'),
@@ -58,7 +79,7 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
     }
   }
 
-  Widget buildProgressBar() {
+  Widget buildProgressBar(ThemeData theme) {
     double progress = getSavingsProgress();
     Color barColor = progress < 0.5
         ? Colors.red
@@ -67,11 +88,11 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: theme.shadowColor.withOpacity(0.05),
             spreadRadius: 2,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -81,16 +102,16 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "Savings Progress",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           LinearProgressIndicator(
             value: progress,
             color: barColor,
             minHeight: 12,
-            backgroundColor: Colors.grey[200],
+            backgroundColor: theme.colorScheme.surfaceVariant,
           ),
           const SizedBox(height: 8),
           Row(
@@ -98,11 +119,13 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
             children: [
               Text(
                 "${(progress * 100).toStringAsFixed(1)}%",
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               Text(
                 "${savedController.text.isEmpty ? '0' : savedController.text} of ${goalController.text.isEmpty ? '0' : goalController.text}",
-                style: TextStyle(color: Colors.grey[600]),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                ),
               ),
             ],
           ),
@@ -111,7 +134,7 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
     );
   }
 
-  Widget buildPieChart() {
+  Widget buildPieChart(ThemeData theme) {
     double goalAmount = double.tryParse(goalController.text) ?? 1.0;
     double savedAmount = double.tryParse(savedController.text) ?? 0.0;
     double remaining = goalAmount - savedAmount;
@@ -119,11 +142,11 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: theme.shadowColor.withOpacity(0.05),
             spreadRadius: 2,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -133,9 +156,9 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "Savings Breakdown",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -177,7 +200,8 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
     );
   }
 
-  Widget buildInputField(String label, TextEditingController controller, {TextInputType? keyboardType}) {
+  Widget buildInputField(String label, TextEditingController controller, ThemeData theme, {TextInputType? keyboardType}) {
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: TextField(
@@ -189,7 +213,9 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
             borderRadius: BorderRadius.circular(8),
           ),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.9),
+          fillColor: isDark
+              ? theme.colorScheme.surface.withOpacity(0.8)
+              : theme.colorScheme.surface,
         ),
         onChanged: (value) => setState(() {}),
       ),
@@ -198,152 +224,129 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Savings Goal Tracker"),
         centerTitle: true,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6B73FF), Color(0xFF000DFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF6B73FF),
-              Color(0xFF000DFF),
-            ],
-          ),
-        ),
+        color: theme.colorScheme.background,
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 80, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Track Your Savings Goal",
-                  style: TextStyle(
-                    fontSize: 20,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Card(
+                  color: theme.cardColor,
                   elevation: 4,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          buildInputField("Goal Title", titleController),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "Target Date",
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        buildInputField("Goal Title", titleController, theme),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Target Date",
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: () async {
+                            DateTime? pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime(2050),
+                            );
+                            if (pickedDate != null) {
+                              setState(() => selectedDate = pickedDate);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            side: BorderSide(color: theme.colorScheme.primary),
                           ),
-                          const SizedBox(height: 8),
-                          OutlinedButton(
-                            onPressed: () async {
-                              DateTime? pickedDate = await showDatePicker(
-                                context: context,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime(2050),
-                              );
-                              if (pickedDate != null) {
-                                setState(() => selectedDate = pickedDate);
-                              }
-                            },
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 50),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.calendar_today, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                selectedDate == null
+                                    ? "Select Target Date"
+                                    : "Target: ${selectedDate!.toLocal()}".split(' ')[0],
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        buildInputField(
+                          "Goal Amount",
+                          goalController,
+                          theme,
+                          keyboardType: TextInputType.number,
+                        ),
+                        buildInputField(
+                          "Saved Amount",
+                          savedController,
+                          theme,
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: saveProgress,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              side: BorderSide(color: Colors.blue.shade400),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.calendar_today, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  selectedDate == null
-                                      ? "Select Target Date"
-                                      : "Target: ${selectedDate!.toLocal()}".split(' ')[0],
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          buildInputField(
-                            "Goal Amount",
-                            goalController,
-                            keyboardType: TextInputType.number,
-                          ),
-                          buildInputField(
-                            "Saved Amount",
-                            savedController,
-                            keyboardType: TextInputType.number,
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: saveProgress,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade700,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                "Update Progress",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
+                            child: const Text(
+                              "Update Progress",
+                              style: TextStyle(
+                                fontSize: 16,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                buildProgressBar(),
+                buildProgressBar(theme),
                 const SizedBox(height: 16),
-                buildPieChart(),
+                buildPieChart(theme),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   "Savings History",
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -351,14 +354,16 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: theme.cardColor,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         "No savings history yet.\nStart by adding your first goal!",
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        ),
                       ),
                     ),
                   )
@@ -372,40 +377,39 @@ class _SavingsGoalPageState extends State<SavingsGoalPage> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         elevation: 2,
+                        color: theme.cardColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(8),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          title: Text(
+                            entry["title"],
+                            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            title: Text(
-                              entry["title"],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Saved: \$${entry["saved"]} / Goal: \$${entry["goal"]}",
-                                  style: TextStyle(color: Colors.grey[600]),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                "Saved: \$${entry["saved"]} / Goal: \$${entry["goal"]}",
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  "Target: ${entry["date"]}",
-                                  style: TextStyle(color: Colors.grey[600]),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "Target: ${entry["date"]}",
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                                 ),
-                              ],
-                            ),
-                            trailing: entry["saved"] == entry["goal"]
-                                ? const Icon(Icons.check_circle, color: Colors.green)
-                                : const Icon(Icons.hourglass_bottom, color: Colors.orange),
+                              ),
+                            ],
                           ),
+                          trailing: entry["saved"] == entry["goal"]
+                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              : const Icon(Icons.hourglass_bottom, color: Colors.orange),
                         ),
                       );
                     },

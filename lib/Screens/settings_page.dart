@@ -76,31 +76,72 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {});
   }
 
-  void _editField(String title, String initialValue, Function(String) onSaved, {bool isPassword = false}) {
+  void _editField(
+    String title,
+    String initialValue,
+    Function(String) onSaved, {
+    bool isPassword = false,
+  }) {
     final controller = TextEditingController(text: initialValue);
     bool obscure = isPassword;
+    final _formKey = GlobalKey<FormState>();
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text('Edit $title'),
-          content: TextField(
-            controller: controller,
-            obscureText: obscure,
-            keyboardType: title == "Phone" ? TextInputType.phone : (isPassword ? TextInputType.visiblePassword : TextInputType.emailAddress),
-            decoration: InputDecoration(
-              labelText: title,
-              border: const OutlineInputBorder(),
-              suffixIcon: isPassword
-                  ? IconButton(
-                      icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () {
-                        setDialogState(() {
-                          obscure = !obscure;
-                        });
-                      },
-                    )
-                  : null,
+          content: Form(
+            key: _formKey,
+            child: TextFormField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: title == "Phone"
+                  ? TextInputType.phone
+                  : (isPassword
+                      ? TextInputType.visiblePassword
+                      : TextInputType.emailAddress),
+              decoration: InputDecoration(
+                labelText: title,
+                border: const OutlineInputBorder(),
+                suffixIcon: isPassword
+                    ? IconButton(
+                        icon: Icon(
+                            obscure ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscure = !obscure;
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              validator: (value) {
+                if (isPassword) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a password';
+                  }
+                  if (value.length < 6) {
+                    return 'Password must be at least 6 characters';
+                  }
+                } else if (title == "Email" || title == "Emel") {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter an email';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      .hasMatch(value)) {
+                    return 'Please enter a valid email';
+                  }
+                } else if (title == "Phone" || title == "Telefon") {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a phone number';
+                  }
+                  if (!RegExp(r'^[0-9]{10,15}$').hasMatch(value)) {
+                    return 'Please enter a valid phone number';
+                  }
+                }
+                return null;
+              },
             ),
           ),
           actions: [
@@ -110,10 +151,12 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                onSaved(controller.text.trim());
-                _saveProfile();
-                Navigator.pop(context);
-                setState(() {});
+                if (_formKey.currentState!.validate()) {
+                  onSaved(controller.text.trim());
+                  _saveProfile();
+                  Navigator.pop(context);
+                  setState(() {});
+                }
               },
               child: const Text("Save"),
             ),
@@ -134,14 +177,17 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text("Cancel"),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) =>  LoginPage()),
-                (route) => false,
-              );
+          ElevatedButton(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => LoginPage()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text("Log Out"),
           ),
@@ -150,70 +196,49 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showNotifications(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Notifications"),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: notifications.isEmpty
-              ? const Text("No notifications yet.")
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) => ListTile(
-                    leading: const Icon(Icons.notifications),
-                    title: Text(notifications[index]),
-                  ),
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
+  Widget _buildSettingsItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool showTrailing,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon, color: theme.colorScheme.primary),
+      title: Text(
+        title,
+        style: theme.textTheme.bodyLarge,
       ),
+      subtitle: Text(
+        subtitle,
+        style: theme.textTheme.bodySmall,
+      ),
+      trailing: showTrailing
+          ? trailing ??
+              Icon(Icons.chevron_right, color: theme.colorScheme.primary)
+          : trailing,
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      minVerticalPadding: 0,
     );
   }
 
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Select Language"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              value: 'en',
-              groupValue: language,
-              title: const Text("English"),
-              onChanged: (val) {
-                _saveLanguage(val!);
-                Navigator.pop(context);
-              },
-            ),
-            RadioListTile<String>(
-              value: 'ms',
-              groupValue: language,
-              title: const Text("Bahasa Malaysia"),
-              onChanged: (val) {
-                _saveLanguage(val!);
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
+  Widget _buildDivider() {
+    return const Divider(
+      height: 1,
+      thickness: 1,
+      indent: 16,
+      endIndent: 16,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     if (_loading) {
       return const Scaffold(
@@ -221,32 +246,34 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     }
 
-    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(language == 'ms' ? "Tetapan" : "Settings"),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () => _showNotifications(context),
-          ),
-        ],
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: Container(
+        color: theme.colorScheme.background,
+        child: ListView(
           children: [
-            // User Profile Section
+            const SizedBox(height: 24),
+            // Profile Section
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 30,
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
-                    child: const Icon(Icons.person, size: 30),
+                    radius: 32,
+                    backgroundColor: theme.colorScheme.primary,
+                    child: Text(
+                      user.isNotEmpty ? user[0].toUpperCase() : "?",
+                      style: TextStyle(
+                        fontSize: 28,
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Column(
@@ -293,7 +320,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     context,
                     icon: Icons.lock_outline,
                     title: language == 'ms' ? "Tukar Kata Laluan" : "Change Password",
-                    subtitle: language == 'ms' ? "Kemas kini kata laluan anda" : "Update your login password",
+                    subtitle: language == 'ms'
+                        ? "Kemas kini kata laluan anda"
+                        : "Update your login password",
                     showTrailing: true,
                     onTap: () {
                       _editField(
@@ -383,148 +412,107 @@ class _SettingsPageState extends State<SettingsPage> {
                     showTrailing: false,
                     trailing: Switch(
                       value: isDarkMode,
-                      onChanged: (value) {
-                        themeProvider.toggleTheme(value);
-                        _addNotification(language == 'ms'
-                            ? (value ? "Mod gelap diaktifkan" : "Mod cerah diaktifkan")
-                            : (value ? "Dark mode enabled" : "Light mode enabled"));
+                      onChanged: (val) {
+                        Provider.of<ThemeProvider>(context, listen: false)
+                            .toggleTheme(val);
                       },
-                      activeColor: theme.colorScheme.primary,
                     ),
-                    onTap: () {},
                   ),
                   _buildDivider(),
                   _buildSettingsItem(
                     context,
-                    icon: Icons.notifications_none,
-                    title: language == 'ms' ? "Notifikasi" : "Notifications",
-                    subtitle: language == 'ms'
-                        ? "Lihat semua aktiviti"
-                        : "View all activities",
-                    showTrailing: true,
-                    onTap: () => _showNotifications(context),
-                  ),
-                  _buildDivider(),
-                  _buildSettingsItem(
-                    context,
-                    icon: Icons.language_outlined,
+                    icon: Icons.language,
                     title: language == 'ms' ? "Bahasa" : "Language",
-                    subtitle: language == 'ms' ? "Bahasa Malaysia" : "English (US)",
-                    showTrailing: true,
-                    onTap: _showLanguageDialog,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Support Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Text(
-                language == 'ms' ? "SOKONGAN" : "SUPPORT",
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _buildSettingsItem(
-                    context,
-                    icon: Icons.help_outline,
-                    title: language == 'ms' ? "Pusat Bantuan" : "Help Center",
-                    subtitle: language == 'ms'
-                        ? "Dapatkan bantuan aplikasi"
-                        : "Get help with the app",
-                    showTrailing: true,
-                    onTap: () {},
-                  ),
-                  _buildDivider(),
-                  _buildSettingsItem(
-                    context,
-                    icon: Icons.feedback_outlined,
-                    title: language == 'ms' ? "Maklum Balas" : "Send Feedback",
-                    subtitle: language == 'ms'
-                        ? "Kongsi pendapat anda"
-                        : "Share your thoughts with us",
-                    showTrailing: true,
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // About Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Text(
-                language == 'ms' ? "TENTANG" : "ABOUT",
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _buildSettingsItem(
-                    context,
-                    icon: Icons.info_outline,
-                    title: language == 'ms' ? "Tentang Aplikasi" : "About App",
-                    subtitle: "Version 1.0.0",
+                    subtitle: language == 'ms' ? "Melayu" : "English",
                     showTrailing: true,
                     onTap: () {
-                      showAboutDialog(
+                      showDialog(
                         context: context,
-                        applicationName: "Money Manager",
-                        applicationVersion: "1.0.0",
-                        applicationLegalese: "© 2025 Your Company",
-                        children: [
-                          const SizedBox(height: 16),
-                          Text(
-                            language == 'ms'
-                                ? "Aplikasi pengurusan wang yang cantik untuk membantu anda menjejak perbelanjaan dan simpanan anda."
-                                : "A beautiful money management app to help you track your expenses and savings.",
-                            style: theme.textTheme.bodyMedium,
+                        builder: (context) => AlertDialog(
+                          title: Text(language == 'ms'
+                              ? "Pilih Bahasa"
+                              : "Select Language"),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RadioListTile<String>(
+                                value: 'en',
+                                groupValue: language,
+                                onChanged: (val) {
+                                  _saveLanguage(val!);
+                                  Navigator.pop(context);
+                                },
+                                title: const Text("English"),
+                              ),
+                              RadioListTile<String>(
+                                value: 'ms',
+                                groupValue: language,
+                                onChanged: (val) {
+                                  _saveLanguage(val!);
+                                  Navigator.pop(context);
+                                },
+                                title: const Text("Melayu"),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       );
                     },
                   ),
                   _buildDivider(),
                   _buildSettingsItem(
                     context,
-                    icon: Icons.star_border_outlined,
-                    title: language == 'ms' ? "Beri Penilaian" : "Rate Us",
+                    icon: Icons.notifications_outlined,
+                    title: language == 'ms' ? "Notifikasi" : "Notifications",
                     subtitle: language == 'ms'
-                        ? "Kongsi pengalaman anda"
-                        : "Share your experience",
+                        ? "Lihat notifikasi terkini"
+                        : "View recent notifications",
                     showTrailing: true,
-                    onTap: () {},
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(language == 'ms'
+                              ? "Notifikasi"
+                              : "Notifications"),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: notifications.isEmpty
+                                ? Text(language == 'ms'
+                                    ? "Tiada notifikasi"
+                                    : "No notifications yet.")
+                                : ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: notifications.length,
+                                    itemBuilder: (context, index) => ListTile(
+                                      leading:
+                                          const Icon(Icons.notifications),
+                                      title: Text(notifications[index]),
+                                    ),
+                                  ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(language == 'ms'
+                                  ? "Tutup"
+                                  : "Close"),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   _buildDivider(),
                   _buildSettingsItem(
                     context,
                     icon: Icons.share_outlined,
-                    title: language == 'ms' ? "Kongsi Aplikasi" : "Share App",
-                    subtitle: language == 'ms'
-                        ? "Beritahu rakan anda"
+                    title: language == 'ms'
+                        ? "Kongsi dengan rakan"
                         : "Tell your friends",
+                    subtitle: language == 'ms'
+                        ? "Kongsi aplikasi ini"
+                        : "Share this app",
                     showTrailing: true,
                     onTap: () {},
                   ),
@@ -558,62 +546,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSettingsItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    bool showTrailing = true,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    final theme = Theme.of(context);
-
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: theme.colorScheme.primary),
-      ),
-      title: Text(
-        title,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
-        ),
-      ),
-      trailing: showTrailing
-          ? trailing ??
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              )
-          : trailing,
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      minVerticalPadding: 0,
-    );
-  }
-
-  Widget _buildDivider() {
-    return const Divider(
-      height: 1,
-      thickness: 1,
-      indent: 16,
-      endIndent: 16,
     );
   }
 }

@@ -17,13 +17,42 @@ class _BudgetPageState extends State<BudgetPage> {
   final othersController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadBudget();
+  }
+
+  Future<void> _loadBudget() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      incomeController.text = prefs.getString('budget_income') ?? '';
+      savingsController.text = prefs.getString('budget_savings') ?? '';
+      foodController.text = prefs.getString('budget_food') ?? '';
+      transportController.text = prefs.getString('budget_transport') ?? '';
+      othersController.text = prefs.getString('budget_others') ?? '';
+    });
+  }
+
+  Future<void> _saveBudget() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('budget_income', incomeController.text);
+    await prefs.setString('budget_savings', savingsController.text);
+    await prefs.setString('budget_food', foodController.text);
+    await prefs.setString('budget_transport', transportController.text);
+    await prefs.setString('budget_others', othersController.text);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Budget Planner"),
         centerTitle: true,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -36,22 +65,13 @@ class _BudgetPageState extends State<BudgetPage> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFE1F5FE),
-              Color(0xFFB3E5FC),
-            ],
-          ),
-        ),
+        color: theme.colorScheme.background,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Input Card
               Card(
+                color: theme.cardColor,
                 elevation: 4,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -114,15 +134,17 @@ class _BudgetPageState extends State<BudgetPage> {
                         width: double.infinity,
                         child: FilledButton.icon(
                           icon: const Icon(Icons.calculate, size: 20),
-                          label: const Text("Calculate Budget"),
-                          onPressed: () => setState(() {}),
+                          label: const Text("Save & Calculate"),
+                          onPressed: () {
+                            _saveBudget();
+                            setState(() {});
+                          },
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
               _buildBudgetOverview(context),
               const SizedBox(height: 20),
@@ -140,6 +162,7 @@ class _BudgetPageState extends State<BudgetPage> {
     foodController.clear();
     transportController.clear();
     othersController.clear();
+    _saveBudget();
     setState(() {});
   }
 
@@ -153,6 +176,8 @@ class _BudgetPageState extends State<BudgetPage> {
     required String label,
     required IconData icon,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
@@ -164,7 +189,9 @@ class _BudgetPageState extends State<BudgetPage> {
           borderRadius: BorderRadius.circular(8),
         ),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
+        fillColor: isDark
+            ? theme.colorScheme.surface.withOpacity(0.8)
+            : theme.colorScheme.surface,
       ),
       onChanged: (value) => setState(() {}),
     );
@@ -177,6 +204,7 @@ class _BudgetPageState extends State<BudgetPage> {
     final isWarning = recommendation.contains("⚠");
 
     return Card(
+      color: theme.cardColor,
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -286,6 +314,7 @@ class _BudgetPageState extends State<BudgetPage> {
         ),
         const SizedBox(height: 12),
         Card(
+          color: theme.cardColor,
           elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -331,6 +360,7 @@ class _BudgetPageState extends State<BudgetPage> {
         ),
         const SizedBox(height: 16),
         Card(
+          color: theme.cardColor,
           elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

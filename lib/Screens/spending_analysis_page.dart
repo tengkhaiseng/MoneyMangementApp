@@ -1,28 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
-void main() {
-  runApp(const MyApp());
-}
+class Expense {
+  final String category;
+  final double amount;
+  final String date;
+  final String description;
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  Expense({
+    required this.category,
+    required this.amount,
+    required this.date,
+    required this.description,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Spending Analysis',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      darkTheme: ThemeData.dark().copyWith(
-        primaryColor: Colors.blueAccent,
-      ),
-      home: const SpendingAnalysisPage(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
+  Map<String, dynamic> toJson() => {
+        'category': category,
+        'amount': amount,
+        'date': date,
+        'description': description,
+      };
+
+  factory Expense.fromJson(Map<String, dynamic> json) => Expense(
+        category: json['category'],
+        amount: (json['amount'] as num).toDouble(),
+        date: json['date'],
+        description: json['description'],
+      );
 }
 
 class SpendingAnalysisPage extends StatefulWidget {
@@ -33,60 +39,82 @@ class SpendingAnalysisPage extends StatefulWidget {
 }
 
 class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
-  final List<Expense> expenses = [];
+  List<Expense> expenses = [];
   String selectedCategory = "All";
 
-  void _openExpenseForm() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadExpenses();
+  }
+
+  Future<void> _loadExpenses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? expensesJson = prefs.getString('spending_analysis_expenses');
+    if (expensesJson != null) {
+      final List<dynamic> decoded = jsonDecode(expensesJson);
+      setState(() {
+        expenses = decoded.map((e) => Expense.fromJson(e)).toList();
+      });
+    }
+  }
+
+  Future<void> _saveExpenses() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'spending_analysis_expenses',
+      jsonEncode(expenses.map((e) => e.toJson()).toList()),
+    );
+  }
+
+  void _openExpenseForm({Expense? editExpense, int? editIndex}) async {
     final expense = await showModalBottomSheet<Expense>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => const ExpenseForm(),
+      backgroundColor: Colors.transparent,
+      builder: (context) => ExpenseForm(expense: editExpense),
     );
-
     if (expense != null) {
       setState(() {
-        expenses.add(expense);
+        if (editIndex != null) {
+          expenses[editIndex] = expense;
+        } else {
+          expenses.add(expense);
+        }
       });
+      _saveExpenses();
     }
+  }
+
+  void _deleteExpense(int index) async {
+    setState(() {
+      expenses.removeAt(index);
+    });
+    await _saveExpenses();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    
+    final bgColor = theme.colorScheme.background;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Spending Analysis"),
-        backgroundColor: Colors.transparent,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _openExpenseForm,
+            onPressed: () => _openExpenseForm(),
             tooltip: 'Add Expense',
           ),
         ],
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDarkMode
-                ? [
-                    Colors.deepPurple.shade900,
-                    Colors.indigo.shade900,
-                    Colors.black,
-                  ]
-                : [
-                    Colors.blue.shade50,
-                    Colors.blue.shade100,
-                    Colors.white,
-                  ],
-          ),
-        ),
+        color: bgColor,
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
@@ -97,23 +125,22 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox(height: 80), // Space for app bar
-                    
-                    // Category Filter Chip Bar
-                    _buildCategoryFilter(),
-                    
-                    // Summary Cards
-                    _buildSummaryCards(),
-                    
-                    // Charts Section
+                    const SizedBox(height: 16),
+                    _buildCategoryFilter(theme, isDarkMode),
+                    _buildSummaryCards(theme, isDarkMode),
                     SizedBox(
                       height: 400,
                       child: DefaultTabController(
                         length: 2,
                         child: Column(
                           children: [
-                            const TabBar(
-                              tabs: [
+                            TabBar(
+                              labelColor: theme.colorScheme.primary,
+                              unselectedLabelColor: isDarkMode
+                                  ? Colors.white70
+                                  : Colors.grey[700],
+                              indicatorColor: theme.colorScheme.primary,
+                              tabs: const [
                                 Tab(icon: Icon(Icons.pie_chart)),
                                 Tab(icon: Icon(Icons.bar_chart)),
                               ],
@@ -121,8 +148,8 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
                             Expanded(
                               child: TabBarView(
                                 children: [
-                                  _buildPieChart(isDarkMode),
-                                  _buildBarChart(isDarkMode),
+                                  _buildPieChart(isDarkMode, theme),
+                                  _buildBarChart(isDarkMode, theme),
                                 ],
                               ),
                             ),
@@ -130,27 +157,20 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
                         ),
                       ),
                     ),
-                    
-                    // Expense List Header
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           "Recent Expenses",
-                          style: TextStyle(
-                            fontSize: 18,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black,
+                            color: theme.textTheme.bodyLarge?.color,
                           ),
                         ),
                       ),
                     ),
-                    
-                    // Expense List
-                    _buildExpenseList(isDarkMode),
-                    
-                    // Add some bottom padding
+                    _buildExpenseList(isDarkMode, theme),
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -160,17 +180,16 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _openExpenseForm,
+        onPressed: () => _openExpenseForm(),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),
-        backgroundColor: theme.primaryColor,
       ),
     );
   }
 
-  Widget _buildCategoryFilter() {
-    final categories = ["All", "Food", "Transport", "Entertainment", "Shopping", "Bills"];
-    final theme = Theme.of(context);
-    
+  Widget _buildCategoryFilter(ThemeData theme, bool isDarkMode) {
+    final categories = ["All", "Food", "Transport", "Entertainment", "Shopping", "Bills", "Others"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -186,14 +205,16 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
                   selectedCategory = selected ? category : "All";
                 });
               },
-              selectedColor: theme.primaryColor.withOpacity(0.2),
-              checkmarkColor: theme.primaryColor,
+              selectedColor: theme.colorScheme.primary.withOpacity(0.2),
+              checkmarkColor: theme.colorScheme.primary,
               labelStyle: TextStyle(
-                color: selectedCategory == category ? theme.primaryColor : null,
+                color: selectedCategory == category
+                    ? theme.colorScheme.primary
+                    : (isDarkMode ? Colors.white : Colors.black),
               ),
-              backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.7),
+              backgroundColor: isDarkMode
+                  ? theme.colorScheme.surface.withOpacity(0.5)
+                  : theme.colorScheme.surface,
             ),
           );
         }).toList(),
@@ -201,58 +222,66 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
     );
   }
 
-  Widget _buildSummaryCards() {
+  Widget _buildSummaryCards(ThemeData theme, bool isDarkMode) {
     final filteredExpenses = selectedCategory == "All"
         ? expenses
         : expenses.where((e) => e.category == selectedCategory).toList();
-    
+
     final totalSpent = filteredExpenses.fold(0.0, (sum, e) => sum + e.amount);
     final avgSpending = filteredExpenses.isEmpty ? 0 : totalSpent / filteredExpenses.length;
     final budget = 1000.0;
     final remainingBudget = budget - totalSpent;
-    
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Wrap(
         spacing: 8.0,
         runSpacing: 8.0,
         children: [
-          // Total Spent Card
           _buildSummaryCard(
+            theme,
             "Total Spent",
             "\$${totalSpent.toStringAsFixed(2)}",
             Colors.redAccent,
             Icons.attach_money,
+            isDarkMode,
           ),
-          // Average Spending Card
           _buildSummaryCard(
+            theme,
             "Avg Spending",
             "\$${avgSpending.toStringAsFixed(2)}",
             Colors.orangeAccent,
             Icons.trending_up,
+            isDarkMode,
           ),
-          // Budget Card
           _buildSummaryCard(
+            theme,
             "Remaining",
             "\$${remainingBudget.toStringAsFixed(2)}",
             remainingBudget >= 0 ? Colors.green : Colors.red,
             remainingBudget >= 0 ? Icons.check_circle : Icons.warning,
+            isDarkMode,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, Color color, IconData icon) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+  Widget _buildSummaryCard(
+    ThemeData theme,
+    String title,
+    String value,
+    Color color,
+    IconData icon,
+    bool isDarkMode,
+  ) {
     return SizedBox(
       width: 150,
       child: Card(
         elevation: 2,
-        color: isDarkMode 
-            ? Colors.black.withOpacity(0.4)
-            : Colors.white.withOpacity(0.8),
+        color: isDarkMode
+            ? theme.colorScheme.surface.withOpacity(0.7)
+            : theme.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -267,8 +296,7 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
                   const SizedBox(width: 8),
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: 12, 
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
                     ),
                   ),
@@ -277,8 +305,7 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
               const SizedBox(height: 8),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 18,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -290,7 +317,7 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
     );
   }
 
-  Widget _buildPieChart(bool isDarkMode) {
+  Widget _buildPieChart(bool isDarkMode, ThemeData theme) {
     final filteredExpenses = selectedCategory == "All"
         ? expenses
         : expenses.where((e) => e.category == selectedCategory).toList();
@@ -304,26 +331,34 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
             const SizedBox(height: 16),
             Text(
               "No data available",
-              style: TextStyle(color: Colors.grey[600]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ],
         ),
       );
     }
 
+    // Group by category
+    final Map<String, double> categoryTotals = {};
+    for (var e in filteredExpenses) {
+      categoryTotals[e.category] = (categoryTotals[e.category] ?? 0) + e.amount;
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: PieChart(
         PieChartData(
-          sections: filteredExpenses.map((expense) {
+          sections: categoryTotals.entries.map((entry) {
             return PieChartSectionData(
-              value: expense.amount,
-              title: "${expense.category}\n\$${expense.amount.toStringAsFixed(2)}",
-              color: getCategoryColor(expense.category),
+              value: entry.value,
+              title: "${entry.key}\n\$${entry.value.toStringAsFixed(2)}",
+              color: getCategoryColor(entry.key),
               radius: 80,
-              titleStyle: TextStyle(
-                fontSize: 12,
+              titleStyle: theme.textTheme.bodySmall?.copyWith(
                 color: isDarkMode ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
               ),
             );
           }).toList(),
@@ -334,7 +369,7 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
     );
   }
 
-  Widget _buildBarChart(bool isDarkMode) {
+  Widget _buildBarChart(bool isDarkMode, ThemeData theme) {
     final filteredExpenses = selectedCategory == "All"
         ? expenses
         : expenses.where((e) => e.category == selectedCategory).toList();
@@ -348,99 +383,117 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
             const SizedBox(height: 16),
             Text(
               "No data available",
-              style: TextStyle(color: Colors.grey[600]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ],
         ),
       );
     }
 
+    // Group by category
+    final Map<String, double> categoryTotals = {};
+    for (var e in filteredExpenses) {
+      categoryTotals[e.category] = (categoryTotals[e.category] ?? 0) + e.amount;
+    }
+    final categories = categoryTotals.keys.toList();
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          barTouchData: BarTouchData(enabled: true),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      filteredExpenses[value.toInt()].category.substring(0, 3),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDarkMode ? Colors.white : Colors.black,
+      child: Column(
+        children: [
+          // Add a simple legend for the bar chart
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
+              const SizedBox(width: 6),
+              Text(
+                "Bar height = Total spent per category",
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 60,
+                      getTitlesWidget: (value, meta) => Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: Text(
+                          "\$${value.toInt()}",
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    value.toInt().toString(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= categories.length) return const SizedBox.shrink();
+                        return Text(
+                          categories[index],
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        );
+                      },
                     ),
+                  ),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: FlGridData(show: true, horizontalInterval: 10),
+                borderData: FlBorderData(show: false),
+                barGroups: categories.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final category = entry.value;
+                  return BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: categoryTotals[category]!,
+                        color: getCategoryColor(category),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
                   );
-                },
+                }).toList(),
               ),
             ),
           ),
-          gridData: FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          barGroups: filteredExpenses.asMap().entries.map((entry) {
-            final index = entry.key;
-            final expense = entry.value;
-            return BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: expense.amount,
-                  color: getCategoryColor(expense.category),
-                  width: 20,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            );
-          }).toList(),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildExpenseList(bool isDarkMode) {
+  Widget _buildExpenseList(bool isDarkMode, ThemeData theme) {
     final filteredExpenses = selectedCategory == "All"
         ? expenses
         : expenses.where((e) => e.category == selectedCategory).toList();
 
     if (filteredExpenses.isEmpty) {
-      return SizedBox(
-        height: 200,
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.receipt, size: 48, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                "No expenses recorded",
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _openExpenseForm,
-                child: const Text("Add Your First Expense"),
-              ),
-            ],
+          child: Text(
+            "No expenses yet.",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
           ),
         ),
       );
@@ -449,24 +502,18 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       itemCount: filteredExpenses.length,
       itemBuilder: (context, index) {
         final expense = filteredExpenses[index];
+        final realIndex = expenses.indexOf(expense);
         return Card(
-          margin: const EdgeInsets.only(bottom: 8.0),
-          elevation: 1,
-          color: isDarkMode 
-              ? Colors.black.withOpacity(0.4)
-              : Colors.white.withOpacity(0.85),
+          color: isDarkMode
+              ? theme.colorScheme.surface.withOpacity(0.7)
+              : theme.cardColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
             leading: Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
@@ -480,22 +527,38 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
             ),
             title: Text(
               expense.category,
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
+                color: theme.textTheme.bodyLarge?.color,
               ),
             ),
             subtitle: Text(
-              expense.date,
-              style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.grey[600]),
-            ),
-            trailing: Text(
-              "\$${expense.amount.toStringAsFixed(2)}",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.redAccent,
+              "${expense.date} • ${expense.description}",
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
               ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "-\$${expense.amount.toStringAsFixed(2)}",
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  tooltip: "Edit",
+                  onPressed: () => _openExpenseForm(editExpense: expense, editIndex: realIndex),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20),
+                  tooltip: "Delete",
+                  onPressed: () => _deleteExpense(realIndex),
+                ),
+              ],
             ),
           ),
         );
@@ -505,18 +568,27 @@ class _SpendingAnalysisPageState extends State<SpendingAnalysisPage> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case "Food": return Icons.restaurant;
-      case "Transport": return Icons.directions_car;
-      case "Entertainment": return Icons.movie;
-      case "Shopping": return Icons.shopping_bag;
-      case "Bills": return Icons.receipt;
-      default: return Icons.money;
+      case "Food":
+        return Icons.restaurant;
+      case "Transport":
+        return Icons.directions_car;
+      case "Entertainment":
+        return Icons.movie;
+      case "Shopping":
+        return Icons.shopping_bag;
+      case "Bills":
+        return Icons.receipt;
+      case "Others":
+        return Icons.more_horiz;
+      default:
+        return Icons.attach_money;
     }
   }
 }
 
 class ExpenseForm extends StatefulWidget {
-  const ExpenseForm({super.key});
+  final Expense? expense;
+  const ExpenseForm({super.key, this.expense});
 
   @override
   State<ExpenseForm> createState() => _ExpenseFormState();
@@ -524,9 +596,23 @@ class ExpenseForm extends StatefulWidget {
 
 class _ExpenseFormState extends State<ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
-  String _selectedCategory = "Food";
+  late String _selectedCategory;
+  late TextEditingController _amountController;
+  late TextEditingController _descController;
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = widget.expense?.category ?? "Food";
+    _amountController = TextEditingController(
+        text: widget.expense != null ? widget.expense!.amount.toString() : "");
+    _descController = TextEditingController(
+        text: widget.expense != null ? widget.expense!.description : "");
+    _selectedDate = widget.expense != null
+        ? DateTime.tryParse(widget.expense!.date) ?? DateTime.now()
+        : DateTime.now();
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -535,12 +621,14 @@ class _ExpenseFormState extends State<ExpenseForm> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       builder: (context, child) {
+        final theme = Theme.of(context);
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.colorScheme.primary,
+              onPrimary: theme.colorScheme.onPrimary,
+              surface: theme.colorScheme.surface,
+              onSurface: theme.colorScheme.onSurface,
             ),
           ),
           child: child!,
@@ -557,13 +645,15 @@ class _ExpenseFormState extends State<ExpenseForm> {
   @override
   void dispose() {
     _amountController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -571,19 +661,7 @@ class _ExpenseFormState extends State<ExpenseForm> {
       child: Container(
         padding: const EdgeInsets.all(20.0),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDarkMode
-                ? [
-                    Colors.deepPurple.shade800,
-                    Colors.indigo.shade800,
-                  ]
-                : [
-                    Colors.blue.shade100,
-                    Colors.white,
-                  ],
-          ),
+          color: theme.colorScheme.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Form(
@@ -592,10 +670,9 @@ class _ExpenseFormState extends State<ExpenseForm> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                "Add New Expense",
-                style: TextStyle(
-                  fontSize: 20,
+              Text(
+                widget.expense == null ? "Add New Expense" : "Edit Expense",
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -603,43 +680,49 @@ class _ExpenseFormState extends State<ExpenseForm> {
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
+                items: [
+                  "Food",
+                  "Transport",
+                  "Entertainment",
+                  "Shopping",
+                  "Bills",
+                  "Others"
+                ]
+                    .map((cat) => DropdownMenuItem(
+                          value: cat,
+                          child: Text(cat),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedCategory = val!;
+                  });
+                },
                 decoration: InputDecoration(
                   labelText: "Category",
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   filled: true,
-                  fillColor: isDarkMode 
-                      ? Colors.black.withOpacity(0.2)
-                      : Colors.white.withOpacity(0.8),
+                  fillColor: isDarkMode
+                      ? theme.colorScheme.surface.withOpacity(0.8)
+                      : theme.colorScheme.surface,
                 ),
-                items: ["Food", "Transport", "Entertainment", "Shopping", "Bills"]
-                    .map((category) {
-                  return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value!;
-                  });
-                },
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: "Amount",
-                  prefixText: "\$ ",
+                  prefixIcon: const Icon(Icons.attach_money),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   filled: true,
-                  fillColor: isDarkMode 
-                      ? Colors.black.withOpacity(0.2)
-                      : Colors.white.withOpacity(0.8),
+                  fillColor: isDarkMode
+                      ? theme.colorScheme.surface.withOpacity(0.8)
+                      : theme.colorScheme.surface,
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -661,40 +744,52 @@ class _ExpenseFormState extends State<ExpenseForm> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     filled: true,
-                    fillColor: isDarkMode 
-                        ? Colors.black.withOpacity(0.2)
-                        : Colors.white.withOpacity(0.8),
+                    fillColor: isDarkMode
+                        ? theme.colorScheme.surface.withOpacity(0.8)
+                        : theme.colorScheme.surface,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "${_selectedDate.toLocal()}".split(' ')[0],
+                        "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
+                        style: theme.textTheme.bodyMedium,
                       ),
-                      const Icon(Icons.calendar_today),
+                      const Icon(Icons.calendar_today, size: 18),
                     ],
                   ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descController,
+                decoration: InputDecoration(
+                  labelText: "Description",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode
+                      ? theme.colorScheme.surface.withOpacity(0.8)
+                      : theme.colorScheme.surface,
                 ),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    final expense = Expense(
-                      category: _selectedCategory,
-                      amount: double.parse(_amountController.text),
-                      date: "${_selectedDate.toLocal()}".split(' ')[0],
-                    );
-                    Navigator.pop(context, expense);
+                    Navigator.pop(
+                        context,
+                        Expense(
+                          category: _selectedCategory,
+                          amount: double.parse(_amountController.text),
+                          date:
+                              "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
+                          description: _descController.text,
+                        ));
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text("Add Expense"),
+                child: Text(widget.expense == null ? "Add Expense" : "Save Changes"),
               ),
             ],
           ),
@@ -704,25 +799,21 @@ class _ExpenseFormState extends State<ExpenseForm> {
   }
 }
 
-class Expense {
-  final String category;
-  final double amount;
-  final String date;
-
-  Expense({
-    required this.category,
-    required this.amount,
-    required this.date,
-  });
-}
-
 Color getCategoryColor(String category) {
   switch (category) {
-    case "Food": return Colors.green;
-    case "Transport": return Colors.blue;
-    case "Entertainment": return Colors.orange;
-    case "Shopping": return Colors.purple;
-    case "Bills": return Colors.red;
-    default: return Colors.grey;
+    case "Food":
+      return Colors.green;
+    case "Transport":
+      return Colors.blue;
+    case "Entertainment":
+      return Colors.orange;
+    case "Shopping":
+      return Colors.purple;
+    case "Bills":
+      return Colors.red;
+    case "Others":
+      return Colors.grey;
+    default:
+      return Colors.grey;
   }
 }
