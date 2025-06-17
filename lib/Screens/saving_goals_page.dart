@@ -3,430 +3,385 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+class SavingGoal {
+  String title;
+  double goalAmount;
+  double savedAmount;
+  String targetDate;
+
+  SavingGoal({
+    required this.title,
+    required this.goalAmount,
+    required this.savedAmount,
+    required this.targetDate,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'goalAmount': goalAmount,
+        'savedAmount': savedAmount,
+        'targetDate': targetDate,
+      };
+
+  factory SavingGoal.fromJson(Map<String, dynamic> json) => SavingGoal(
+        title: json['title'],
+        goalAmount: (json['goalAmount'] as num).toDouble(),
+        savedAmount: (json['savedAmount'] as num).toDouble(),
+        targetDate: json['targetDate'],
+      );
+}
+
 class SavingsGoalPage extends StatefulWidget {
-  const SavingsGoalPage({super.key});
+  const SavingsGoalPage({super.key, this.language = ''});
+  final String language;
 
   @override
   State<SavingsGoalPage> createState() => _SavingsGoalPageState();
 }
 
 class _SavingsGoalPageState extends State<SavingsGoalPage> {
-  final titleController = TextEditingController();
-  final goalController = TextEditingController();
-  final savedController = TextEditingController();
-  DateTime? selectedDate;
-
-  List<Map<String, dynamic>> savingsHistory = [];
+  List<SavingGoal> goals = [];
 
   @override
   void initState() {
     super.initState();
-    _loadSavings();
+    _loadGoals();
   }
 
-  Future<void> _loadSavings() async {
+  Future<void> _loadGoals() async {
     final prefs = await SharedPreferences.getInstance();
-    final historyJson = prefs.getString('savings_history');
-    if (historyJson != null) {
+    final String? goalsJson = prefs.getString('saving_goals');
+    if (goalsJson != null) {
+      final List<dynamic> decoded = jsonDecode(goalsJson);
       setState(() {
-        savingsHistory = List<Map<String, dynamic>>.from(jsonDecode(historyJson));
+        goals = decoded.map((e) => SavingGoal.fromJson(e)).toList();
       });
     }
   }
 
-  Future<void> _saveSavings() async {
+  Future<void> _saveGoals() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('savings_history', jsonEncode(savingsHistory));
+    await prefs.setString(
+      'saving_goals',
+      jsonEncode(goals.map((e) => e.toJson()).toList()),
+    );
   }
 
-  double getSavingsProgress() {
-    double goalAmount = double.tryParse(goalController.text) ?? 1.0;
-    double savedAmount = double.tryParse(savedController.text) ?? 0.0;
-    if (goalAmount == 0) return 0.0;
-    return savedAmount / goalAmount;
-  }
-
-  void saveProgress() {
-    if (goalController.text.isNotEmpty && savedController.text.isNotEmpty) {
+  void _showGoalForm({SavingGoal? goal, int? editIndex}) async {
+    final result = await showModalBottomSheet<SavingGoal>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SavingGoalForm(goal: goal),
+    );
+    if (result != null) {
       setState(() {
-        savingsHistory.add({
-          "title": titleController.text,
-          "goal": goalController.text,
-          "saved": savedController.text,
-          "date": selectedDate != null ? selectedDate!.toLocal().toString().split(' ')[0] : "No Date Set",
-        });
+        if (editIndex != null) {
+          goals[editIndex] = result;
+        } else {
+          goals.add(result);
+        }
       });
-      _saveSavings();
-      titleController.clear();
-      goalController.clear();
-      savedController.clear();
-      selectedDate = null;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Progress saved successfully!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _saveGoals();
     }
   }
 
-  Widget buildProgressBar(ThemeData theme) {
-    double progress = getSavingsProgress();
-    Color barColor = progress < 0.5
-        ? Colors.red
-        : (progress < 0.8 ? Colors.orange : Colors.green);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.05),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Savings Progress",
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: progress,
-            color: barColor,
-            minHeight: 12,
-            backgroundColor: theme.colorScheme.surfaceVariant,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "${(progress * 100).toStringAsFixed(1)}%",
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "${savedController.text.isEmpty ? '0' : savedController.text} of ${goalController.text.isEmpty ? '0' : goalController.text}",
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildPieChart(ThemeData theme) {
-    double goalAmount = double.tryParse(goalController.text) ?? 1.0;
-    double savedAmount = double.tryParse(savedController.text) ?? 0.0;
-    double remaining = goalAmount - savedAmount;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.05),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Savings Breakdown",
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 200,
-            child: PieChart(
-              PieChartData(
-                sections: [
-                  PieChartSectionData(
-                    value: savedAmount,
-                    title: "Saved\n${savedAmount.toStringAsFixed(2)}",
-                    color: Colors.green[400],
-                    radius: 60,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  PieChartSectionData(
-                    value: remaining,
-                    title: "Remaining\n${remaining.toStringAsFixed(2)}",
-                    color: Colors.red[400],
-                    radius: 60,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-                centerSpaceRadius: 40,
-                sectionsSpace: 2,
-                startDegreeOffset: -90,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildInputField(String label, TextEditingController controller, ThemeData theme, {TextInputType? keyboardType}) {
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          filled: true,
-          fillColor: isDark
-              ? theme.colorScheme.surface.withOpacity(0.8)
-              : theme.colorScheme.surface,
-        ),
-        onChanged: (value) => setState(() {}),
-      ),
-    );
+  void _deleteGoal(int index) async {
+    setState(() {
+      goals.removeAt(index);
+    });
+    await _saveGoals();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Savings Goal Tracker"),
-        centerTitle: true,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
       ),
-      body: Container(
-        color: theme.colorScheme.background,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Track Your Savings Goal",
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  color: theme.cardColor,
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text("Add New Goal"),
+            onPressed: () => _showGoalForm(),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (goals.isEmpty)
+            Center(
+              child: Text(
+                "No savings goals yet.",
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ...goals.asMap().entries.map((entry) {
+            final i = entry.key;
+            final goal = entry.value;
+            final percent = (goal.savedAmount / goal.goalAmount).clamp(0.0, 1.0);
+            final remaining = (goal.goalAmount - goal.savedAmount).clamp(0.0, goal.goalAmount);
+            return Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        buildInputField("Goal Title", titleController, theme),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Target Date",
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime(2050),
-                            );
-                            if (pickedDate != null) {
-                              setState(() => selectedDate = pickedDate);
-                            }
-                          },
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            side: BorderSide(color: theme.colorScheme.primary),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.calendar_today, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                selectedDate == null
-                                    ? "Select Target Date"
-                                    : "Target: ${selectedDate!.toLocal()}".split(' ')[0],
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            goal.title,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        buildInputField(
-                          "Goal Amount",
-                          goalController,
-                          theme,
-                          keyboardType: TextInputType.number,
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          tooltip: "Edit",
+                          onPressed: () => _showGoalForm(goal: goal, editIndex: i),
                         ),
-                        buildInputField(
-                          "Saved Amount",
-                          savedController,
-                          theme,
-                          keyboardType: TextInputType.number,
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: saveProgress,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              "Update Progress",
-                              style: TextStyle(
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: "Delete",
+                          onPressed: () => _deleteGoal(i),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                buildProgressBar(theme),
-                const SizedBox(height: 16),
-                buildPieChart(theme),
-                const SizedBox(height: 16),
-                Text(
-                  "Savings History",
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (savingsHistory.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(8),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Saved: \$${goal.savedAmount.toStringAsFixed(2)} / Goal: \$${goal.goalAmount.toStringAsFixed(2)}",
+                      style: theme.textTheme.bodySmall,
                     ),
-                    child: Center(
-                      child: Text(
-                        "No savings history yet.\nStart by adding your first goal!",
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: percent,
+                      minHeight: 10,
+                      backgroundColor: Colors.grey[300],
+                      color: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "${(percent * 100).toStringAsFixed(1)}% progress",
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 180,
+                      child: PieChart(
+                        PieChartData(
+                          sections: [
+                            PieChartSectionData(
+                              value: goal.savedAmount,
+                              color: Colors.green,
+                              title: "Saved\n\$${goal.savedAmount.toStringAsFixed(2)}",
+                              radius: 60,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            PieChartSectionData(
+                              value: remaining,
+                              color: Colors.red,
+                              title: "Remaining\n\$${remaining.toStringAsFixed(2)}",
+                              radius: 60,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                          centerSpaceRadius: 40,
+                          sectionsSpace: 2,
                         ),
                       ),
                     ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: savingsHistory.length,
-                    itemBuilder: (context, index) {
-                      var entry = savingsHistory[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        elevation: 2,
-                        color: theme.cardColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          title: Text(
-                            entry["title"],
-                            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                "Saved: \$${entry["saved"]} / Goal: \$${entry["goal"]}",
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "Target: ${entry["date"]}",
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: entry["saved"] == entry["goal"]
-                              ? const Icon(Icons.check_circle, color: Colors.green)
-                              : const Icon(Icons.hourglass_bottom, color: Colors.orange),
-                        ),
-                      );
-                    },
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 18),
+                        const SizedBox(width: 6),
+                        Text("Target: ${goal.targetDate}"),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class SavingGoalForm extends StatefulWidget {
+  final SavingGoal? goal;
+  const SavingGoalForm({super.key, this.goal});
+
+  @override
+  State<SavingGoalForm> createState() => _SavingGoalFormState();
+}
+
+class _SavingGoalFormState extends State<SavingGoalForm> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _titleController;
+  late TextEditingController _goalAmountController;
+  late TextEditingController _savedAmountController;
+  DateTime? _targetDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.goal?.title ?? "");
+    _goalAmountController = TextEditingController(
+        text: widget.goal != null ? widget.goal!.goalAmount.toString() : "");
+    _savedAmountController = TextEditingController(
+        text: widget.goal != null ? widget.goal!.savedAmount.toString() : "");
+    _targetDate = widget.goal != null
+        ? DateTime.tryParse(widget.goal!.targetDate)
+        : null;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _goalAmountController.dispose();
+    _savedAmountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _targetDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _targetDate = picked;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.goal == null ? "Add Savings Goal" : "Edit Savings Goal",
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: "Goal Title",
+                    border: OutlineInputBorder(),
                   ),
+                  validator: (val) => val == null || val.isEmpty ? "Enter goal title" : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _goalAmountController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: "Goal Amount",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return "Enter goal amount";
+                    if (double.tryParse(val) == null) return "Enter a valid number";
+                    if (double.parse(val) <= 0) return "Goal must be > 0";
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _savedAmountController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: "Saved Amount",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return "Enter saved amount";
+                    if (double.tryParse(val) == null) return "Enter a valid number";
+                    if (double.parse(val) < 0) return "Saved can't be negative";
+                    if (_goalAmountController.text.isNotEmpty &&
+                        double.tryParse(_goalAmountController.text) != null &&
+                        double.parse(val) > double.parse(_goalAmountController.text)) {
+                      return "Saved can't exceed goal";
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today),
+                  title: Text(_targetDate == null
+                      ? "Select Target Date"
+                      : "${_targetDate!.year}-${_targetDate!.month.toString().padLeft(2, '0')}-${_targetDate!.day.toString().padLeft(2, '0')}"),
+                  trailing: TextButton(
+                    child: const Text("Pick"),
+                    onPressed: _pickDate,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState!.validate() && _targetDate != null) {
+                        Navigator.pop(
+                          context,
+                          SavingGoal(
+                            title: _titleController.text,
+                            goalAmount: double.parse(_goalAmountController.text),
+                            savedAmount: double.parse(_savedAmountController.text),
+                            targetDate:
+                                "${_targetDate!.year}-${_targetDate!.month.toString().padLeft(2, '0')}-${_targetDate!.day.toString().padLeft(2, '0')}",
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(widget.goal == null ? "Add Goal" : "Save Changes"),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    titleController.dispose();
-    goalController.dispose();
-    savedController.dispose();
-    super.dispose();
   }
 }

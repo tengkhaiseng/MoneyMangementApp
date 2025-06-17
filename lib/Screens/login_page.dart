@@ -17,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _hasRegisteredUser = false;
   AppCredentials? _registeredUser;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -40,6 +41,11 @@ class _LoginPageState extends State<LoginPage> {
           phone: phone,
         );
       });
+    } else {
+      setState(() {
+        _hasRegisteredUser = false;
+        _registeredUser = null;
+      });
     }
   }
 
@@ -57,31 +63,39 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _loginUser() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 800));
 
-      if (_registeredUser != null &&
-          usernameController.text.trim() == _registeredUser!.username &&
-          passwordController.text == _registeredUser!.password) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomePage(
-                user: _registeredUser!.username,
-                email: _registeredUser!.email,
-                phone: _registeredUser!.phone,
-              ),
-            ),
-          );
-        }
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username');
+      final password = prefs.getString('password');
+      final email = prefs.getString('email');
+      final phone = prefs.getString('phone');
+
+      if (username == null ||
+          password == null ||
+          email == null ||
+          phone == null ||
+          usernameController.text.trim() != username ||
+          passwordController.text != password) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Account does not exist or wrong password.";
+        });
       } else {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid username or password'),
-            backgroundColor: Colors.red,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(
+              user: username,
+              email: email,
+              phone: phone,
+            ),
           ),
         );
       }
@@ -106,6 +120,7 @@ class _LoginPageState extends State<LoginPage> {
         _registeredUser = credentials;
         usernameController.text = credentials.username;
         passwordController.text = credentials.password;
+        _errorMessage = null;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -119,6 +134,11 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.white70 : Colors.grey[600];
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -131,60 +151,53 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               Text(
                 'Welcome Back',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: textColor,
                     ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Sign in to continue',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: hintColor,
                     ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              if (!_hasRegisteredUser)
-                Column(
-                  children: [
-                    const Text(
-                      'No user found. Please register first.',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
                     TextFormField(
                       controller: usernameController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Username',
-                        prefixIcon: const Icon(Icons.person_outline),
+                        labelStyle: TextStyle(color: hintColor),
+                        prefixIcon: Icon(Icons.person_outline, color: hintColor),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       validator: _validateUsername,
                       textInputAction: TextInputAction.next,
-                      enabled: _hasRegisteredUser,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: passwordController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outlined),
+                        labelStyle: TextStyle(color: hintColor),
+                        prefixIcon: Icon(Icons.lock_outlined, color: hintColor),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
+                            color: hintColor,
                           ),
                           onPressed: () {
                             setState(() => _obscurePassword = !_obscurePassword);
@@ -197,19 +210,22 @@ class _LoginPageState extends State<LoginPage> {
                       validator: _validatePassword,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
-                      enabled: _hasRegisteredUser,
                     ),
                     const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _hasRegisteredUser ? () {} : null,
-                        child: const Text('Forgot Password?'),
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: (_isLoading || !_hasRegisteredUser) ? null : _loginUser,
+                      onPressed: _isLoading ? null : _loginUser,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -227,56 +243,22 @@ class _LoginPageState extends State<LoginPage> {
                             )
                           : const Text('SIGN IN'),
                     ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: Colors.grey[400])),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            'OR',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: Colors.grey[400])),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.g_mobiledata, size: 36),
-                          onPressed: _hasRegisteredUser ? () {} : null,
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(Icons.facebook, size: 36),
-                          onPressed: _hasRegisteredUser ? () {} : null,
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(Icons.email, size: 36),
-                          onPressed: _hasRegisteredUser ? () {} : null,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Don't have an account?"),
-                        TextButton(
-                          onPressed: _navigateToRegister,
-                          child: const Text(
-                            'Register Now',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Don't have an account?"),
+                  TextButton(
+                    onPressed: _navigateToRegister,
+                    child: const Text(
+                      'Register Now',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

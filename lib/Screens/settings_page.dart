@@ -31,8 +31,8 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      email = prefs.getString('profile_email') ?? prefs.getString('email') ?? 'user@email.com';
-      phone = prefs.getString('profile_phone') ?? prefs.getString('phone') ?? '+60 123456789';
+      email = prefs.getString('email') ?? 'user@email.com';
+      phone = prefs.getString('phone') ?? '+60 123456789';
       user = prefs.getString('username') ?? 'User';
       password = prefs.getString('password') ?? '';
       _loading = false;
@@ -41,8 +41,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _saveProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('profile_email', email);
-    await prefs.setString('profile_phone', phone);
+    await prefs.setString('email', email);
+    await prefs.setString('phone', phone);
     await prefs.setString('password', password);
   }
 
@@ -73,7 +73,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     notifications.insert(0, message);
     await prefs.setStringList('notifications', notifications);
-    setState(() {});
   }
 
   void _editField(
@@ -179,8 +178,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
+              // DO NOT clear all prefs! Only navigate to login page.
               if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -193,36 +191,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSettingsItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool showTrailing,
-    VoidCallback? onTap,
-    Widget? trailing,
-  }) {
-    final theme = Theme.of(context);
-    return ListTile(
-      leading: Icon(icon, color: theme.colorScheme.primary),
-      title: Text(
-        title,
-        style: theme.textTheme.bodyLarge,
-      ),
-      subtitle: Text(
-        subtitle,
-        style: theme.textTheme.bodySmall,
-      ),
-      trailing: showTrailing
-          ? trailing ??
-              Icon(Icons.chevron_right, color: theme.colorScheme.primary)
-          : trailing,
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      minVerticalPadding: 0,
     );
   }
 
@@ -548,12 +516,34 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-}
 
-// Helper for other pages to add notifications
-Future<void> addNotification(String message) async {
-  final prefs = await SharedPreferences.getInstance();
-  final notifications = prefs.getStringList('notifications') ?? [];
-  notifications.insert(0, message);
-  await prefs.setStringList('notifications', notifications);
+  Widget _buildSettingsItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool showTrailing,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon, color: theme.colorScheme.primary),
+      title: Text(
+        title,
+        style: theme.textTheme.bodyLarge,
+      ),
+      subtitle: Text(
+        subtitle,
+        style: theme.textTheme.bodySmall,
+      ),
+      trailing: showTrailing
+          ? trailing ??
+              Icon(Icons.chevron_right, color: theme.colorScheme.primary)
+          : trailing,
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      minVerticalPadding: 0,
+    );
+  }
 }

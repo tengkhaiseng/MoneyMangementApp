@@ -1,663 +1,785 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class BudgetPage extends StatefulWidget {
-  const BudgetPage({super.key});
+  final String language;
+  const BudgetPage({super.key, required this.language});
 
   @override
   State<BudgetPage> createState() => _BudgetPageState();
 }
 
 class _BudgetPageState extends State<BudgetPage> {
-  final incomeController = TextEditingController();
-  final savingsController = TextEditingController();
-  final foodController = TextEditingController();
-  final transportController = TextEditingController();
-  final othersController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController incomeController = TextEditingController();
+  final TextEditingController savingsController = TextEditingController();
+  final TextEditingController foodController = TextEditingController();
+  final TextEditingController transportController = TextEditingController();
+  final TextEditingController othersController = TextEditingController();
+
+  double income = 0;
+  double targetSavings = 0;
+  double food = 0;
+  double transport = 0;
+  double others = 0;
+
+  List<Map<String, dynamic>> history = [];
 
   @override
   void initState() {
     super.initState();
-    _loadBudget();
+    _loadHistory();
   }
 
-  Future<void> _loadBudget() async {
+  Future<void> _loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      incomeController.text = prefs.getString('budget_income') ?? '';
-      savingsController.text = prefs.getString('budget_savings') ?? '';
-      foodController.text = prefs.getString('budget_food') ?? '';
-      transportController.text = prefs.getString('budget_transport') ?? '';
-      othersController.text = prefs.getString('budget_others') ?? '';
-    });
+    final String? historyJson = prefs.getString('budget_history');
+    if (historyJson != null) {
+      setState(() {
+        history = List<Map<String, dynamic>>.from(jsonDecode(historyJson));
+      });
+    }
   }
 
-  Future<void> _saveBudget() async {
+  Future<void> _saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('budget_income', incomeController.text);
-    await prefs.setString('budget_savings', savingsController.text);
-    await prefs.setString('budget_food', foodController.text);
-    await prefs.setString('budget_transport', transportController.text);
-    await prefs.setString('budget_others', othersController.text);
+    await prefs.setString('budget_history', jsonEncode(history));
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        income = double.tryParse(incomeController.text) ?? 0;
+        targetSavings = double.tryParse(savingsController.text) ?? 0;
+        food = double.tryParse(foodController.text) ?? 0;
+        transport = double.tryParse(transportController.text) ?? 0;
+        others = double.tryParse(othersController.text) ?? 0;
+        final entry = {
+          'date': DateTime.now().toIso8601String(),
+          'income': income,
+          'targetSavings': targetSavings,
+          'food': food,
+          'transport': transport,
+          'others': others,
+        };
+        history.insert(0, entry);
+        _saveHistory();
+      });
+      FocusScope.of(context).unfocus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Budget saved!')),
+      );
+    }
+  }
+
+  double get totalExpenses => food + transport + others;
+  double get actualSaved => (income - totalExpenses).clamp(0, income);
+  double get budgetUsagePercent => (income > 0) ? (totalExpenses / income) : 0.0;
+
+  String get feedback {
+    if (income == 0) return '';
+    if (totalExpenses > income) {
+      return "You are over budget!";
+    } else if (actualSaved >= targetSavings) {
+      return "Congratulations! You achieved your savings target.";
+    } else if (actualSaved < targetSavings && actualSaved >= 0) {
+      return "Warning: You are below your savings target.";
+    } else {
+      return "";
+    }
+  }
+
+  Color get feedbackColor {
+    if (income == 0) return Colors.transparent;
+    if (totalExpenses > income) {
+      return Colors.red.shade100;
+    } else if (actualSaved >= targetSavings) {
+      return Colors.green.shade100;
+    } else if (actualSaved < targetSavings && actualSaved >= 0) {
+      return Colors.orange.shade100;
+    } else {
+      return Colors.pink.shade100;
+    }
+  }
+
+  IconData get feedbackIcon {
+    if (income == 0) return Icons.info;
+    if (totalExpenses > income) {
+      return Icons.warning;
+    } else if (actualSaved >= targetSavings) {
+      return Icons.check_circle;
+    } else if (actualSaved < targetSavings && actualSaved >= 0) {
+      return Icons.info;
+    } else {
+      return Icons.info;
+    }
+  }
+
+  Color get feedbackIconColor {
+    if (income == 0) return Colors.blue;
+    if (totalExpenses > income) {
+      return Colors.red;
+    } else if (actualSaved >= targetSavings) {
+      return Colors.green;
+    } else if (actualSaved < targetSavings && actualSaved >= 0) {
+      return Colors.orange;
+    } else {
+      return Colors.pink;
+    }
+  }
+
+  double get savedAmount => (income - totalExpenses).clamp(0, income);
+
+  List<PieChartSectionData> getPieSections() {
+    final total = income > 0 ? income : 1; // avoid division by zero
+    final saved = savedAmount;
+    final foodPct = food / total;
+    final transportPct = transport / total;
+    final othersPct = others / total;
+    final savedPct = saved / total;
+
+    return [
+      PieChartSectionData(
+        value: saved.toDouble(),
+        color: Colors.green,
+        title: saved > 0 ? "${(savedPct * 100).round()}%" : "",
+        radius: 60,
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      PieChartSectionData(
+        value: food,
+        color: Colors.orange,
+        title: food > 0 ? "${(foodPct * 100).round()}%" : "",
+        radius: 60,
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      PieChartSectionData(
+        value: transport,
+        color: Colors.blue,
+        title: transport > 0 ? "${(transportPct * 100).round()}%" : "",
+        radius: 60,
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      PieChartSectionData(
+        value: others,
+        color: Colors.red,
+        title: others > 0 ? "${(othersPct * 100).round()}%" : "",
+        radius: 60,
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ];
+  }
+
+  List<BarChartGroupData> getBarGroups() {
+    return [
+      BarChartGroupData(
+        x: 0,
+        barRods: [
+          BarChartRodData(
+            toY: food,
+            color: Colors.orange,
+            width: 24,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+      BarChartGroupData(
+        x: 1,
+        barRods: [
+          BarChartRodData(
+            toY: transport,
+            color: Colors.blue,
+            width: 24,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+      BarChartGroupData(
+        x: 2,
+        barRods: [
+          BarChartRodData(
+            toY: others,
+            color: Colors.red,
+            width: 24,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+      BarChartGroupData(
+        x: 3,
+        barRods: [
+          BarChartRodData(
+            toY: savedAmount,
+            color: Colors.green,
+            width: 24,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Widget _buildLegend(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        Text(label, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  void _showHistory() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => BudgetHistorySheet(
+        history: history,
+        onSelect: (entry) {
+          setState(() {
+            income = entry['income'];
+            targetSavings = entry['targetSavings'];
+            food = entry['food'];
+            transport = entry['transport'];
+            others = entry['others'];
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hint,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      validator: (val) {
+        if (val == null || val.isEmpty) return "Enter $label";
+        if (double.tryParse(val) == null) return "Enter a valid number";
+        if (double.parse(val) < 0) return "Amount can't be negative";
+        return null;
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Budget Planner"),
-        centerTitle: true,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: _clearAllFields,
+            tooltip: "History",
+            onPressed: _showHistory,
           ),
         ],
       ),
-      body: Container(
-        color: theme.colorScheme.background,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Card(
-                color: theme.cardColor,
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Enter Your Budget",
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildCurrencyInputField(
-                        context,
-                        controller: incomeController,
-                        label: "Monthly Income",
-                        icon: Icons.attach_money,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildCurrencyInputField(
-                        context,
-                        controller: savingsController,
-                        label: "Target Savings",
-                        icon: Icons.savings,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Expense Categories",
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildCurrencyInputField(
-                        context,
-                        controller: foodController,
-                        label: "Food & Dining",
-                        icon: Icons.restaurant,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildCurrencyInputField(
-                        context,
-                        controller: transportController,
-                        label: "Transportation",
-                        icon: Icons.directions_car,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildCurrencyInputField(
-                        context,
-                        controller: othersController,
-                        label: "Other Expenses",
-                        icon: Icons.more_horiz,
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          icon: const Icon(Icons.calculate, size: 20),
-                          label: const Text("Save & Calculate"),
-                          onPressed: () {
-                            _saveBudget();
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildBudgetOverview(context),
-              const SizedBox(height: 20),
-              _buildVisualizationSection(context),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _clearAllFields() {
-    incomeController.clear();
-    savingsController.clear();
-    foodController.clear();
-    transportController.clear();
-    othersController.clear();
-    _saveBudget();
-    setState(() {});
-  }
-
-  double _parseInput(String text) {
-    return double.tryParse(text) ?? 0.0;
-  }
-
-  Widget _buildCurrencyInputField(
-    BuildContext context, {
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        prefixText: '\$ ',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        filled: true,
-        fillColor: isDark
-            ? theme.colorScheme.surface.withOpacity(0.8)
-            : theme.colorScheme.surface,
-      ),
-      onChanged: (value) => setState(() {}),
-    );
-  }
-
-  Widget _buildBudgetOverview(BuildContext context) {
-    final theme = Theme.of(context);
-    final usage = getBudgetUsage();
-    final recommendation = getBudgetRecommendations();
-    final isWarning = recommendation.contains("⚠");
-
-    return Card(
-      color: theme.cardColor,
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              "Budget Overview",
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+            // Input Section
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        "Budget Usage",
-                        style: theme.textTheme.titleMedium,
+                      Text("Enter Your Budget",
+                          style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      _buildInputField(
+                        controller: incomeController,
+                        label: "Monthly Income (\$)",
+                        icon: Icons.attach_money,
+                        hint: "e.g. 3000",
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${(usage * 100).toStringAsFixed(1)}% of income",
-                        style: theme.textTheme.bodyLarge,
+                      const SizedBox(height: 12),
+                      _buildInputField(
+                        controller: savingsController,
+                        label: "Target Savings (\$)",
+                        icon: Icons.savings,
+                        hint: "e.g. 500",
                       ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: usage,
-                        strokeWidth: 10,
-                        backgroundColor: theme.colorScheme.surfaceVariant,
-                        color: _getUsageColor(usage),
+                      const SizedBox(height: 18),
+                      Text("Expense Categories",
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      _buildInputField(
+                        controller: foodController,
+                        label: "Food & Dining (\$)",
+                        icon: Icons.restaurant,
+                        hint: "e.g. 800",
                       ),
-                      Text(
-                        "${(usage * 100).toStringAsFixed(0)}%",
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(height: 10),
+                      _buildInputField(
+                        controller: transportController,
+                        label: "Transportation (\$)",
+                        icon: Icons.directions_car,
+                        hint: "e.g. 300",
+                      ),
+                      const SizedBox(height: 10),
+                      _buildInputField(
+                        controller: othersController,
+                        label: "Other Expenses (\$)",
+                        icon: Icons.more_horiz,
+                        hint: "e.g. 200",
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.calculate),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: _submit,
+                          label: const Text("Calculate Budget"),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isWarning
-                    ? theme.colorScheme.errorContainer
-                    : theme.colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    isWarning ? Icons.warning : Icons.check_circle,
-                    color: isWarning
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.tertiary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      recommendation.replaceAll("⚠", "").replaceAll("✅", "").trim(),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isWarning
-                            ? theme.colorScheme.onErrorContainer
-                            : theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(height: 24),
+            // Budget Overview
+            if (income > 0) ...[
+              Text("Budget Overview",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Budget Usage",
+                                style: theme.textTheme.bodyLarge),
+                            const SizedBox(height: 8),
+                            Text(
+                              "${(budgetUsagePercent * 100).toStringAsFixed(1)}% of income",
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Actual Saved: \$${actualSaved.toStringAsFixed(2)} / Target: \$${targetSavings.toStringAsFixed(2)}",
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: CircularProgressIndicator(
+                              value: budgetUsagePercent.clamp(0.0, 1.0),
+                              strokeWidth: 7,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  theme.colorScheme.primary),
+                            ),
+                          ),
+                          Text(
+                            "${(budgetUsagePercent * 100).toStringAsFixed(0)}%",
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              if (feedback.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: feedbackColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        feedbackIcon,
+                        color: feedbackIconColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          feedback,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: feedbackIconColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 18),
+              // Budget Visualization
+              Text("Budget Visualization",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Expense Distribution",
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 180,
+                        child: PieChart(
+                          PieChartData(
+                            sections: getPieSections(),
+                            centerSpaceRadius: 40,
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLegend("Savings", Colors.green),
+                          _buildLegend("Food", Colors.orange),
+                          _buildLegend("Transport", Colors.blue),
+                          _buildLegend("Others", Colors.red),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Spending Comparison",
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 180,
+                        child: BarChart(
+                          BarChartData(
+                            alignment: BarChartAlignment.spaceAround,
+                            maxY: [
+                              food,
+                              transport,
+                              others,
+                              savedAmount
+                            ].reduce((a, b) => a > b ? a : b) +
+                                100,
+                            barTouchData: BarTouchData(enabled: false),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 32,
+                                  getTitlesWidget: (value, meta) => Padding(
+                                    padding: const EdgeInsets.only(right: 4.0),
+                                    child: Text(
+                                      "\$${value.toInt()}",
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, meta) {
+                                    switch (value.toInt()) {
+                                      case 0:
+                                        return const Text("Food");
+                                      case 1:
+                                        return const Text("Transport");
+                                      case 2:
+                                        return const Text("Others");
+                                      case 3:
+                                        return const Text("Savings");
+                                      default:
+                                        return const Text("");
+                                    }
+                                  },
+                                ),
+                              ),
+                              rightTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              topTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                            ),
+                            gridData: FlGridData(show: true, horizontalInterval: 100),
+                            borderData: FlBorderData(show: false),
+                            barGroups: getBarGroups(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildVisualizationSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final hasData = incomeController.text.isNotEmpty;
+class BudgetHistorySheet extends StatelessWidget {
+  final List<Map<String, dynamic>> history;
+  final void Function(Map<String, dynamic> entry) onSelect;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Budget Visualization",
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          color: theme.cardColor,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  "Expense Distribution",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 220,
-                  child: hasData
-                      ? PieChart(
-                          PieChartData(
-                            sections: _generatePieData(),
-                            centerSpaceRadius: 50,
-                            sectionsSpace: 2,
-                            startDegreeOffset: -90,
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            "Enter your budget to see the chart",
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        ),
-                ),
-                if (hasData) ...[
-                  const SizedBox(height: 16),
-                  _buildPieChartLegend(),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          color: theme.cardColor,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  "Spending Comparison",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 220,
-                  child: hasData
-                      ? BarChart(
-                          _generateBarChartData(),
-                        )
-                      : Center(
-                          child: Text(
-                            "Enter your budget to see the chart",
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  const BudgetHistorySheet({
+    super.key,
+    required this.history,
+    required this.onSelect,
+  });
 
-  Widget _buildPieChartLegend() {
-    final List<Map<String, dynamic>> categories = [
-      {"label": "Savings", "color": Colors.green},
-      {"label": "Food", "color": Colors.orange},
-      {"label": "Transport", "color": Colors.blue},
-      {"label": "Others", "color": Colors.red},
-    ];
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      children: categories.map((category) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: category["color"],
-                shape: BoxShape.circle,
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      minChildSize: 0.3,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Text(category["label"]),
-          ],
+              const Text(
+                "Budget History",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: history.isEmpty
+                    ? const Center(child: Text("No history yet."))
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          final entry = history[index];
+                          final date = DateTime.tryParse(entry['date'] ?? "") ??
+                              DateTime.now();
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: ListTile(
+                              title: Text(
+                                "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}",
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                  "Income: \$${entry['income']} | Target Savings: \$${entry['targetSavings']} | Food: \$${entry['food']} | Transport: \$${entry['transport']} | Others: \$${entry['others']}"),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.bar_chart),
+                                tooltip: "View Chart",
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => Dialog(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: SingleChildScrollView(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text(
+                                                "Expense & Savings Distribution",
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              SizedBox(
+                                                height: 180,
+                                                child: PieChart(
+                                                  PieChartData(
+                                                    sections: _getPieSectionsHistory(entry),
+                                                    centerSpaceRadius: 40,
+                                                    sectionsSpace: 2,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              onTap: () {
+                                onSelect(entry);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         );
-      }).toList(),
+      },
     );
   }
 
-  Color _getUsageColor(double usage) {
-    if (usage < 0.5) return Colors.green;
-    if (usage < 0.8) return Colors.orange;
-    return Colors.red;
-  }
-
-  List<PieChartSectionData> _generatePieData() {
-    final savings = _parseInput(savingsController.text);
-    final food = _parseInput(foodController.text);
-    final transport = _parseInput(transportController.text);
-    final others = _parseInput(othersController.text);
-    final total = savings + food + transport + others;
-
-    if (total == 0) return [];
+  List<PieChartSectionData> _getPieSectionsHistory(Map<String, dynamic> entry) {
+    final income = (entry['income'] as num).toDouble();
+    final food = (entry['food'] as num).toDouble();
+    final transport = (entry['transport'] as num).toDouble();
+    final others = (entry['others'] as num).toDouble();
+    final saved = (income - (food + transport + others)).clamp(0, income);
+    final total = income > 0 ? income : 1;
 
     return [
       PieChartSectionData(
-        value: savings,
-        title: "${((savings / total) * 100).toStringAsFixed(1)}%",
+        value: saved.toDouble(),
         color: Colors.green,
+        title: saved > 0 ? "${((saved / total) * 100).round()}%" : "",
         radius: 60,
         titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
           color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
       ),
       PieChartSectionData(
         value: food,
-        title: "${((food / total) * 100).toStringAsFixed(1)}%",
         color: Colors.orange,
+        title: food > 0 ? "${((food / total) * 100).round()}%" : "",
         radius: 60,
         titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
           color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
       ),
       PieChartSectionData(
         value: transport,
-        title: "${((transport / total) * 100).toStringAsFixed(1)}%",
         color: Colors.blue,
+        title: transport > 0 ? "${((transport / total) * 100).round()}%" : "",
         radius: 60,
         titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
           color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
       ),
       PieChartSectionData(
         value: others,
-        title: "${((others / total) * 100).toStringAsFixed(1)}%",
         color: Colors.red,
+        title: others > 0 ? "${((others / total) * 100).round()}%" : "",
         radius: 60,
         titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
           color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
       ),
     ];
-  }
-
-  BarChartData _generateBarChartData() {
-    final food = _parseInput(foodController.text);
-    final transport = _parseInput(transportController.text);
-    final others = _parseInput(othersController.text);
-    final savings = _parseInput(savingsController.text);
-
-    return BarChartData(
-      barTouchData: BarTouchData(
-        enabled: true,
-        touchTooltipData: BarTouchTooltipData(
-          getTooltipColor: (group) => Colors.black87,
-          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-            String category;
-            switch (group.x) {
-              case 1:
-                category = 'Food';
-                break;
-              case 2:
-                category = 'Transport';
-                break;
-              case 3:
-                category = 'Others';
-                break;
-              case 4:
-                category = 'Savings';
-                break;
-              default:
-                category = '';
-            }
-            return BarTooltipItem(
-              '$category\n\$${rod.toY.toStringAsFixed(2)}',
-              const TextStyle(color: Colors.white),
-            );
-          },
-        ),
-      ),
-      titlesData: FlTitlesData(
-        show: true,
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            getTitlesWidget: (value, meta) {
-              String text;
-              switch (value.toInt()) {
-                case 1:
-                  text = 'Food';
-                  break;
-                case 2:
-                  text = 'Transport';
-                  break;
-                case 3:
-                  text = 'Others';
-                  break;
-                case 4:
-                  text = 'Savings';
-                  break;
-                default:
-                  text = '';
-              }
-              return SideTitleWidget(
-                axisSide: meta.axisSide,
-                space: 4,
-                child: Text(text),
-              );
-            },
-            reservedSize: 30,
-          ),
-        ),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 40,
-          ),
-        ),
-        topTitles: AxisTitles(
-          sideTitles: SideTitles(showTitles: false),
-        ),
-        rightTitles: AxisTitles(
-          sideTitles: SideTitles(showTitles: false),
-        ),
-      ),
-      borderData: FlBorderData(show: false),
-      barGroups: [
-        BarChartGroupData(
-          x: 1,
-          barRods: [
-            BarChartRodData(
-              toY: food,
-              color: Colors.orange,
-              width: 20,
-              borderRadius: BorderRadius.circular(4),
-            )
-          ],
-        ),
-        BarChartGroupData(
-          x: 2,
-          barRods: [
-            BarChartRodData(
-              toY: transport,
-              color: Colors.blue,
-              width: 20,
-              borderRadius: BorderRadius.circular(4),
-            )
-          ],
-        ),
-        BarChartGroupData(
-          x: 3,
-          barRods: [
-            BarChartRodData(
-              toY: others,
-              color: Colors.red,
-              width: 20,
-              borderRadius: BorderRadius.circular(4),
-            )
-          ],
-        ),
-        BarChartGroupData(
-          x: 4,
-          barRods: [
-            BarChartRodData(
-              toY: savings,
-              color: Colors.green,
-              width: 20,
-              borderRadius: BorderRadius.circular(4),
-            )
-          ],
-        ),
-      ],
-      gridData: FlGridData(show: true),
-    );
-  }
-
-  double getBudgetUsage() {
-    double totalExpenses = _parseInput(foodController.text) +
-        _parseInput(transportController.text) +
-        _parseInput(othersController.text);
-    double income = _parseInput(incomeController.text);
-    return income > 0 ? totalExpenses / income : 0.0;
-  }
-
-  String getBudgetRecommendations() {
-    double income = _parseInput(incomeController.text);
-    if (income == 0) return "Enter your income to get recommendations";
-
-    double savings = _parseInput(savingsController.text);
-    double totalExpenses = _parseInput(foodController.text) +
-        _parseInput(transportController.text) +
-        _parseInput(othersController.text);
-
-    if (savings < (income * 0.2)) {
-      return "⚠ Consider increasing savings to at least 20% of your income";
-    } else if (totalExpenses > (income * 0.7)) {
-      return "⚠ Your expenses exceed 70% of your income! Try adjusting spending";
-    } else {
-      return "✅ Your budget allocation looks balanced";
-    }
-  }
-
-  @override
-  void dispose() {
-    incomeController.dispose();
-    savingsController.dispose();
-    foodController.dispose();
-    transportController.dispose();
-    othersController.dispose();
-    super.dispose();
   }
 }

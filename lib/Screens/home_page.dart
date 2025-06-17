@@ -102,7 +102,8 @@ class HomePage extends StatelessWidget {
         children: [
           FloatingActionButton.small(
             heroTag: 'currencyBtn',
-            backgroundColor: theme.colorScheme.secondary,
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            foregroundColor: Theme.of(context).colorScheme.onSecondary,
             child: const Icon(Icons.currency_exchange),
             onPressed: () {
               showDialog(
@@ -115,8 +116,8 @@ class HomePage extends StatelessWidget {
           FloatingActionButton(
             onPressed: () {},
             child: const Icon(Icons.add),
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: theme.colorScheme.onPrimary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
         ],
       ),
@@ -134,7 +135,6 @@ class HomePage extends StatelessWidget {
         color: isDark ? theme.colorScheme.surface : background,
         child: Column(
           children: [
-            // Drawer Header with improved contrast for dark mode
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(top: 40, bottom: 24),
@@ -323,7 +323,7 @@ class HomePage extends StatelessWidget {
           value,
           style: theme.textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
+            color: theme.textTheme.bodyLarge?.color,
           ),
         ),
       ],
@@ -345,7 +345,6 @@ class HomePage extends StatelessWidget {
 
   Widget _buildFinancialToolsGrid(BuildContext context, ThemeData theme,
       Color cardColor, Color textColor, bool isDark) {
-    // Make the icons and text larger and more readable
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -370,7 +369,7 @@ class HomePage extends StatelessWidget {
           theme,
           cardColor,
           textColor,
-          const BudgetPage(),
+          const BudgetPage(language: '',),
         ),
         _buildToolCard(
           context,
@@ -379,7 +378,7 @@ class HomePage extends StatelessWidget {
           theme,
           cardColor,
           textColor,
-          const SavingsGoalPage(),
+          const SavingsGoalPage(language: '',),
         ),
         _buildToolCard(
           context,
@@ -430,7 +429,7 @@ class HomePage extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  size: 48, // Larger icon
+                  size: 48,
                   color: theme.colorScheme.primary,
                 ),
               ),
@@ -439,7 +438,7 @@ class HomePage extends StatelessWidget {
                 title,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18, // Larger text
+                  fontSize: 18,
                   color: textColor,
                 ),
                 textAlign: TextAlign.center,
@@ -510,7 +509,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// --- CurrencyDialog Widget ---
 class CurrencyDialog extends StatefulWidget {
   const CurrencyDialog({super.key});
 
