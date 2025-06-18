@@ -121,15 +121,6 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         title: const Text("My Profile"),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              _editField("Email", email, (val) => setState(() => email = val));
-            },
-            tooltip: "Edit Email",
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -197,7 +188,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       icon: Icons.email,
                       title: "Email",
                       value: email,
-                      onEdit: () => _editField("Email", email, (val) => setState(() => email = val)),
                     ),
                     const Divider(height: 24),
                     _buildProfileItem(
@@ -205,7 +195,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       icon: Icons.phone,
                       title: "Phone",
                       value: phone,
-                      onEdit: () => _editField("Phone", phone, (val) => setState(() => phone = val)),
                     ),
                     const Divider(height: 24),
                     _buildProfileItem(
@@ -278,12 +267,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
         ),
-        if (onEdit != null)
-          IconButton(
-            icon: const Icon(Icons.edit, size: 18),
-            onPressed: onEdit,
-            tooltip: "Edit $title",
-          ),
       ],
     );
   }

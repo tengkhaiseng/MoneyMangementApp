@@ -5,7 +5,7 @@ import 'dart:convert';
 
 class BudgetPage extends StatefulWidget {
   final String language;
-  const BudgetPage({super.key, required this.language});
+  const BudgetPage({super.key, required this.language, required Future<void> Function() onBudgetSaved});
 
   @override
   State<BudgetPage> createState() => _BudgetPageState();

@@ -389,47 +389,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildDivider(),
                   _buildSettingsItem(
                     context,
-                    icon: Icons.language,
-                    title: language == 'ms' ? "Bahasa" : "Language",
-                    subtitle: language == 'ms' ? "Melayu" : "English",
-                    showTrailing: true,
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text(language == 'ms'
-                              ? "Pilih Bahasa"
-                              : "Select Language"),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              RadioListTile<String>(
-                                value: 'en',
-                                groupValue: language,
-                                onChanged: (val) {
-                                  _saveLanguage(val!);
-                                  Navigator.pop(context);
-                                },
-                                title: const Text("English"),
-                              ),
-                              RadioListTile<String>(
-                                value: 'ms',
-                                groupValue: language,
-                                onChanged: (val) {
-                                  _saveLanguage(val!);
-                                  Navigator.pop(context);
-                                },
-                                title: const Text("Melayu"),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDivider(),
-                  _buildSettingsItem(
-                    context,
                     icon: Icons.notifications_outlined,
                     title: language == 'ms' ? "Notifikasi" : "Notifications",
                     subtitle: language == 'ms'

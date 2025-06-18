@@ -3,27 +3,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// --- COLOR CONSTANTS --- ///
 
-// Professional Blue-Green Theme (Light)
-const Color kPrimaryBlue = Color(0xFF1565C0); // Deep blue
-const Color kSuccessGreen = Color(0xFF2E7D32); // Success
-const Color kExpenseRed = Color(0xFFD32F2F); // Expense/negative
-const Color kAccentCyan = Color(0xFF00BCD4); // Cyan accent
-const Color kBackgroundLight = Color(0xFFF8FAFB); // Light gray-blue
+// Green Pastel Theme (Light)
+const Color kPrimaryGreen = Color(0xFF219150); // Deep green
+const Color kAccentGreen = Color(0xFF43e97b); // Vivid green
+const Color kPastelGreen1 = Color(0xFFe8f5e9); // Light mint
+const Color kPastelGreen2 = Color(0xFFb2f7cc); // Pastel green
+const Color kPastelGreen3 = Color(0xFFd0f8ce); // Lighter green
 const Color kCardLight = Color(0xFFFFFFFF); // Pure white
 const Color kTextPrimaryLight = Color(0xFF212121); // Dark gray
 const Color kTextSecondaryLight = Color(0xFF757575); // Medium gray
 const Color kDividerLight = Color(0xFFE0E0E0); // Light gray
-
-// Login/Register Pages Theme
-const Color kLoginBackground = Color(0xFFFAFAFA); // Very light gray
-const Color kInputBorder = Color(0xFFE1E5E9);
-const Color kInputFocus = Color(0xFF1976D2);
-const Color kPrimaryButton = Color(0xFF1976D2);
-const Color kPrimaryButtonHover = Color(0xFF1565C0);
-const Color kSecondaryButton = Color(0xFFF5F5F5);
 const Color kErrorColor = Color(0xFFF44336);
 const Color kSuccessColor = Color(0xFF4CAF50);
-const Color kLinkColor = Color(0xFF1976D2);
 
 // Dark Theme
 const Color kDarkBackground = Color(0xFF121212);
@@ -31,9 +22,6 @@ const Color kDarkCard = Color(0xFF1E1E1E);
 const Color kDarkPrimary = Color(0xFF00E676);
 const Color kDarkTextPrimary = Color(0xFFFFFFFF);
 const Color kDarkTextSecondary = Color(0xFFB0B0B0);
-const Color kLoginDarkBackground = Color(0xFF0F0F0F);
-const Color kLoginDarkForm = Color(0xFF1C1C1C);
-const Color kLoginDarkInput = Color(0xFF2C2C2C);
 
 class ThemeProvider with ChangeNotifier {
   bool _isDarkMode = false;
@@ -59,25 +47,25 @@ class ThemeProvider with ChangeNotifier {
 
   ThemeData get themeData => ThemeData(
         brightness: Brightness.light,
-        scaffoldBackgroundColor: kBackgroundLight,
-        primaryColor: kPrimaryBlue,
+        scaffoldBackgroundColor: kPastelGreen1,
+        primaryColor: kPrimaryGreen,
         cardColor: kCardLight,
         dividerColor: kDividerLight,
         colorScheme: ColorScheme(
           brightness: Brightness.light,
-          primary: kPrimaryBlue,
+          primary: kPrimaryGreen,
           onPrimary: Colors.white,
-          secondary: kAccentCyan,
+          secondary: kAccentGreen,
           onSecondary: Colors.white,
           error: kErrorColor,
           onError: Colors.white,
-          background: kBackgroundLight,
+          background: kPastelGreen1,
           onBackground: kTextPrimaryLight,
           surface: kCardLight,
           onSurface: kTextPrimaryLight,
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: kPrimaryBlue,
+          backgroundColor: kPrimaryGreen,
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -93,15 +81,15 @@ class ThemeProvider with ChangeNotifier {
           fillColor: kCardLight,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: kInputBorder),
+            borderSide: BorderSide(color: kDividerLight),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: kInputBorder),
+            borderSide: BorderSide(color: kDividerLight),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: kInputFocus, width: 2),
+            borderSide: BorderSide(color: kPrimaryGreen, width: 2),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -112,11 +100,7 @@ class ThemeProvider with ChangeNotifier {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.resolveWith<Color>(
-              (states) => states.contains(MaterialState.hovered)
-                  ? kPrimaryButtonHover
-                  : kPrimaryButton,
-            ),
+            backgroundColor: MaterialStateProperty.all<Color>(kPrimaryGreen),
             foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
             shape: MaterialStateProperty.all<RoundedRectangleBorder>(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -128,10 +112,10 @@ class ThemeProvider with ChangeNotifier {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all<Color>(kSecondaryButton),
-            foregroundColor: MaterialStateProperty.all<Color>(kPrimaryBlue),
+            backgroundColor: MaterialStateProperty.all<Color>(kCardLight),
+            foregroundColor: MaterialStateProperty.all<Color>(kPrimaryGreen),
             side: MaterialStateProperty.all<BorderSide>(
-              const BorderSide(color: kPrimaryBlue),
+              const BorderSide(color: kPrimaryGreen),
             ),
             shape: MaterialStateProperty.all<RoundedRectangleBorder>(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -142,10 +126,10 @@ class ThemeProvider with ChangeNotifier {
           ),
         ),
         snackBarTheme: const SnackBarThemeData(
-          backgroundColor: kPrimaryBlue,
+          backgroundColor: kPrimaryGreen,
           contentTextStyle: TextStyle(color: Colors.white),
         ),
-        iconTheme: const IconThemeData(color: kPrimaryBlue),
+        iconTheme: const IconThemeData(color: kPrimaryGreen),
         dividerTheme: const DividerThemeData(color: kDividerLight),
       );
 
@@ -159,7 +143,7 @@ class ThemeProvider with ChangeNotifier {
           brightness: Brightness.dark,
           primary: kDarkPrimary,
           onPrimary: Colors.black,
-          secondary: kAccentCyan,
+          secondary: kAccentGreen,
           onSecondary: Colors.black,
           error: kErrorColor,
           onError: Colors.white,
@@ -182,7 +166,7 @@ class ThemeProvider with ChangeNotifier {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: kLoginDarkInput,
+          fillColor: kDarkCard,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: Colors.grey),

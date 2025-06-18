@@ -6,11 +6,11 @@ import 'login_page.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'spending_analysis_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final String user;
   final String email;
   final String phone;
@@ -22,9 +22,38 @@ class HomePage extends StatelessWidget {
     required this.phone,
   });
 
-  Future<void> _showNotifications(BuildContext context) async {
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List<String> notifications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    final notifications = prefs.getStringList('notifications') ?? [];
+    setState(() {
+      notifications = prefs.getStringList('notifications') ?? [];
+    });
+  }
+
+  Future<void> addNotification(String message) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notifs = prefs.getStringList('notifications') ?? [];
+    notifs.insert(0, message);
+    await prefs.setStringList('notifications', notifs);
+    setState(() {
+      notifications = notifs;
+    });
+  }
+
+  void _showNotifications(BuildContext context) async {
+    await _loadNotifications();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -56,33 +85,35 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bgColor = theme.colorScheme.background;
     final cardColor = theme.cardColor;
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Money Manager'),
+        title: const Text("My Profile"),
         centerTitle: true,
-        elevation: 0,
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () => _showNotifications(context),
-          ),
-        ],
       ),
       drawer: _buildDrawer(context, theme),
       body: Container(
-        color: bgColor,
+        decoration: isDark
+            ? null
+            : const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFFe8f5e9),
+                    Color(0xFFb2f7cc),
+                    Color(0xFFd0f8ce),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeHeader(theme, textColor),
+              _buildWelcomeHeader(theme, textColor, isDark),
               const SizedBox(height: 24),
               _buildQuickStatsRow(theme, cardColor, textColor, isDark),
               const SizedBox(height: 24),
@@ -97,122 +128,113 @@ class HomePage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'currencyBtn',
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            foregroundColor: Theme.of(context).colorScheme.onSecondary,
-            child: const Icon(Icons.currency_exchange),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => const CurrencyDialog(),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            onPressed: () {},
-            child: const Icon(Icons.add),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildDrawer(BuildContext context, ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-    final onPrimary = theme.colorScheme.onPrimary;
-    final background = theme.colorScheme.background;
-
     return Drawer(
-      child: Container(
-        color: isDark ? theme.colorScheme.surface : background,
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(top: 40, bottom: 24),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            child: DrawerHeader(
               decoration: BoxDecoration(
-                color: isDark
-                    ? theme.colorScheme.primary.withOpacity(0.18)
-                    : theme.colorScheme.primary.withOpacity(0.12),
+                gradient: isDark
+                    ? null
+                    : const LinearGradient(
+                        colors: [
+                          Color(0xFF43e97b),
+                          Color(0xFF38f9d7),
+                          Color(0xFF43e97b),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                color: isDark ? Colors.green[900] : null,
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(32),
                 ),
               ),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: primary,
-                    child: Text(
-                      user.isNotEmpty ? user[0].toUpperCase() : "?",
-                      style: TextStyle(
-                        fontSize: 28,
-                        color: onPrimary,
-                        fontWeight: FontWeight.bold,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: theme.colorScheme.primary,
+                      child: Text(
+                        widget.user.isNotEmpty ? widget.user[0].toUpperCase() : "?",
+                        style: TextStyle(
+                          fontSize: 28,
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.user,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.green[900],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    email,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? Colors.white.withOpacity(0.7)
-                          : Colors.black54,
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.email,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? Colors.white.withOpacity(0.7)
+                            : Colors.green[800]?.withOpacity(0.7),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.phone,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? Colors.white.withOpacity(0.7)
+                            : Colors.green[800]?.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildDrawerItem(
-                    context,
-                    Icons.person,
-                    'Profile',
-                    ProfilePage(user: user, email: email, phone: phone),
-                    theme,
-                  ),
-                  _buildDrawerItem(
-                    context,
-                    Icons.settings,
-                    'Settings',
-                    const SettingsPage(),
-                    theme,
-                  ),
-                  const Divider(),
-                  _buildDrawerItem(
-                    context,
-                    Icons.exit_to_app,
-                    'Logout',
-                    LoginPage(),
-                    theme,
-                  ),
-                ],
-              ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  context,
+                  Icons.person,
+                  'Profile',
+                  ProfilePage(user: widget.user, email: widget.email, phone: widget.phone),
+                  theme,
+                ),
+                _buildDrawerItem(
+                  context,
+                  Icons.settings,
+                  'Settings',
+                  const SettingsPage(),
+                  theme,
+                ),
+                const Divider(),
+                _buildDrawerItem(
+                  context,
+                  Icons.exit_to_app,
+                  'Logout',
+                  const LoginPage(),
+                  theme,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -226,13 +248,13 @@ class HomePage extends StatelessWidget {
   ) {
     final isDark = theme.brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, color: theme.colorScheme.primary),
+      leading: Icon(icon, color: isDark ? Colors.green : Colors.green[700]),
       title: Text(
         title,
         style: TextStyle(
           color: isDark
               ? theme.colorScheme.onSurface
-              : theme.textTheme.bodyLarge?.color,
+              : Colors.green[900],
         ),
       ),
       onTap: () {
@@ -242,7 +264,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildWelcomeHeader(ThemeData theme, Color textColor) {
+  Widget _buildWelcomeHeader(ThemeData theme, Color textColor, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -250,21 +272,23 @@ class HomePage extends StatelessWidget {
           'Welcome Back!',
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
-            color: textColor,
+            color: isDark ? Colors.white : Colors.green[900],
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
+            color: isDark
+                ? Colors.green.withOpacity(0.18)
+                : Colors.green[100],
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             'Today is ${DateTime.now().toString().split(' ')[0]}',
             style: TextStyle(
               fontSize: 14,
-              color: theme.colorScheme.primary,
+              color: isDark ? Colors.green[200] : Colors.green[900],
             ),
           ),
         ),
@@ -277,12 +301,12 @@ class HomePage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: isDark ? cardColor : Colors.white.withOpacity(0.85),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           if (!isDark)
             BoxShadow(
-              color: Colors.blue.withOpacity(0.08),
+              color: Colors.green.withOpacity(0.08),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -291,31 +315,33 @@ class HomePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem('Total Balance', '\$2,450.00', Icons.account_balance, theme),
-          _buildStatItem('Monthly Budget', '\$1,450.00', Icons.pie_chart, theme),
-          _buildStatItem('Savings', '\$1000.00', Icons.savings, theme),
+          _buildStatItem('Total Balance', '\$2,450.00', Icons.account_balance, theme, isDark),
+          _buildStatItem('Monthly Budget', '\$1,450.00', Icons.pie_chart, theme, isDark),
+          _buildStatItem('Savings', '\$1000.00', Icons.savings, theme, isDark),
         ],
       ),
     );
   }
 
   Widget _buildStatItem(
-      String title, String value, IconData icon, ThemeData theme) {
+      String title, String value, IconData icon, ThemeData theme, bool isDark) {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.15),
+            color: isDark
+                ? Colors.green.withOpacity(0.15)
+                : Colors.green[50],
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          child: Icon(icon, size: 20, color: isDark ? Colors.green : Colors.green[700]),
         ),
         const SizedBox(height: 8),
         Text(
           title,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodySmall?.color,
+            color: isDark ? Colors.white70 : Colors.green[900],
           ),
         ),
         const SizedBox(height: 4),
@@ -323,7 +349,7 @@ class HomePage extends StatelessWidget {
           value,
           style: theme.textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: theme.textTheme.bodyLarge?.color,
+            color: isDark ? Colors.white : Colors.green[900],
           ),
         ),
       ],
@@ -337,7 +363,7 @@ class HomePage extends StatelessWidget {
         title,
         style: theme.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
+          color: Colors.green[800],
         ),
       ),
     );
@@ -361,6 +387,7 @@ class HomePage extends StatelessWidget {
           cardColor,
           textColor,
           const ExpensesPage(),
+          isDark,
         ),
         _buildToolCard(
           context,
@@ -369,7 +396,11 @@ class HomePage extends StatelessWidget {
           theme,
           cardColor,
           textColor,
-          const BudgetPage(language: '',),
+          BudgetPage(
+            language: 'en',
+            onBudgetSaved: () async { return; }, // required param
+          ),
+          isDark,
         ),
         _buildToolCard(
           context,
@@ -378,7 +409,8 @@ class HomePage extends StatelessWidget {
           theme,
           cardColor,
           textColor,
-          const SavingsGoalPage(language: '',),
+          const SavingsGoalPage(),
+          isDark,
         ),
         _buildToolCard(
           context,
@@ -388,6 +420,7 @@ class HomePage extends StatelessWidget {
           cardColor,
           textColor,
           const SpendingAnalysisPage(),
+          isDark,
         ),
       ],
     );
@@ -401,50 +434,54 @@ class HomePage extends StatelessWidget {
     Color cardColor,
     Color textColor,
     Widget page,
+    bool isDark,
   ) {
-    return Card(
-      elevation: 2,
-      color: cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 48,
-                  color: theme.colorScheme.primary,
-                ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? cardColor : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            if (!isDark)
+              BoxShadow(
+                color: Colors.green.withOpacity(0.07),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: textColor,
-                ),
-                textAlign: TextAlign.center,
+          ],
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.green.withOpacity(0.13)
+                    : Colors.green[50],
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
+              child: Icon(
+                icon,
+                size: 48,
+                color: isDark ? Colors.green : Colors.green[700],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: isDark ? Colors.white : Colors.green[900],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
@@ -452,213 +489,83 @@ class HomePage extends StatelessWidget {
 
   Widget _buildRecentActivityList(
       ThemeData theme, Color cardColor, Color textColor, bool isDark) {
-    final recentTransactions = [
-      {'name': 'Grocery Store', 'amount': '-\$85.20', 'time': 'Today, 10:30 AM'},
-      {'name': 'Salary', 'amount': '+\$2,000.00', 'time': 'Yesterday, 09:00 AM'},
-      {'name': 'Netflix', 'amount': '-\$17.99', 'time': 'Yesterday, 08:00 PM'},
-      {'name': 'Bus Ticket', 'amount': '-\$2.50', 'time': '2 days ago, 07:45 AM'},
+    // Dummy data for recent activity
+    final recent = [
+      {
+        'name': 'Grocery Shopping',
+        'amount': '-\$45.00',
+        'time': '2025-06-17',
+        'isIncome': false,
+      },
+      {
+        'name': 'Salary',
+        'amount': '+\$1,200.00',
+        'time': '2025-06-15',
+        'isIncome': true,
+      },
+      {
+        'name': 'Electricity Bill',
+        'amount': '-\$60.00',
+        'time': '2025-06-14',
+        'isIncome': false,
+      },
     ];
 
     return Column(
-      children: recentTransactions.map((transaction) {
-        final isIncome = transaction['amount']!.startsWith('+');
-        return Card(
-          color: cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isIncome
-                    ? Colors.green.withOpacity(0.15)
-                    : Colors.red.withOpacity(0.15),
-                shape: BoxShape.circle,
+      children: recent
+          .map(
+            (transaction) => Card(
+              elevation: 0,
+              color: isDark ? cardColor : Colors.white.withOpacity(0.95),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                isIncome ? Icons.arrow_upward : Icons.arrow_downward,
-                color: isIncome ? Colors.green : Colors.red,
-              ),
-            ),
-            title: Text(
-              transaction['name']!,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-            subtitle: Text(
-              transaction['time']!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-              ),
-            ),
-            trailing: Text(
-              transaction['amount']!,
-              style: TextStyle(
-                color: isIncome ? Colors.green : Colors.red,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class CurrencyDialog extends StatefulWidget {
-  const CurrencyDialog({super.key});
-
-  @override
-  State<CurrencyDialog> createState() => _CurrencyDialogState();
-}
-
-class _CurrencyDialogState extends State<CurrencyDialog> {
-  final amountController = TextEditingController();
-  String from = 'USD';
-  String to = 'MYR';
-  double? rate;
-  double amount = 0;
-  bool loading = false;
-  String? error;
-
-  final Map<String, String> symbols = {
-    'USD': '\$',
-    'MYR': 'RM',
-    'EUR': '€',
-    'SGD': 'S\$',
-    'JPY': '¥',
-  };
-
-  Future<void> _convert() async {
-    setState(() {
-      loading = true;
-      error = null;
-      rate = null;
-    });
-    try {
-      final response = await http.get(Uri.parse(
-          'https://api.exchangerate-api.com/v4/latest/$from'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final rates = data['rates'] as Map<String, dynamic>;
-        if (rates.containsKey(to)) {
-          setState(() {
-            rate = (rates[to] as num).toDouble();
-          });
-        } else {
-          setState(() {
-            error = 'Currency not supported';
-          });
-        }
-      } else {
-        setState(() {
-          error = 'Failed to fetch rate';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        error = 'Error: $e';
-      });
-    } finally {
-      setState(() {
-        loading = false;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    amountController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fromSymbol = symbols[from] ?? '';
-    final toSymbol = symbols[to] ?? '';
-    return AlertDialog(
-      title: const Text('Currency Converter'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: from,
-                  items: symbols.keys
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    setState(() => from = val!);
-                  },
-                  decoration: const InputDecoration(labelText: 'From'),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: transaction['isIncome'] as bool
+                        ? Colors.green.withOpacity(0.15)
+                        : Colors.red.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    transaction['isIncome'] as bool
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                    color: transaction['isIncome'] as bool
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+                title: Text(
+                  transaction['name'] as String,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : Colors.green[900],
+                  ),
+                ),
+                subtitle: Text(
+                  transaction['time'] as String,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.7)
+                        : Colors.green[800]?.withOpacity(0.7),
+                  ),
+                ),
+                trailing: Text(
+                  transaction['amount'] as String,
+                  style: TextStyle(
+                    color: transaction['isIncome'] as bool
+                        ? Colors.green
+                        : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: to,
-                  items: symbols.keys
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    setState(() => to = val!);
-                  },
-                  decoration: const InputDecoration(labelText: 'To'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: amountController,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: 'Amount',
-              prefixText: fromSymbol,
-              border: const OutlineInputBorder(),
             ),
-            onChanged: (val) {
-              setState(() {
-                amount = double.tryParse(val) ?? 0;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          loading
-              ? const CircularProgressIndicator()
-              : error != null
-                  ? Text(error!, style: const TextStyle(color: Colors.red))
-                  : rate != null
-                      ? Text(
-                          '$fromSymbol${amount.toStringAsFixed(2)} $from = $toSymbol${(amount * rate!).toStringAsFixed(2)} $to',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 18),
-                        )
-                      : const SizedBox.shrink(),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-        ElevatedButton(
-          onPressed: loading ? null : _convert,
-          child: const Text('Convert'),
-        ),
-      ],
+          )
+          .toList(),
     );
   }
 }

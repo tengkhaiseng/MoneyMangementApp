@@ -1,10 +1,13 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_page.dart';
 import 'register_page.dart';
+import 'home_page.dart';
 import 'app_credentials.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -15,50 +18,13 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _hasRegisteredUser = false;
-  AppCredentials? _registeredUser;
   String? _errorMessage;
 
   @override
-  void initState() {
-    super.initState();
-    _loadRegisteredUser();
-  }
-
-  Future<void> _loadRegisteredUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final username = prefs.getString('username');
-    final password = prefs.getString('password');
-    final email = prefs.getString('email');
-    final phone = prefs.getString('phone');
-    if (username != null && password != null && email != null && phone != null) {
-      setState(() {
-        _hasRegisteredUser = true;
-        _registeredUser = AppCredentials(
-          username: username,
-          password: password,
-          email: email,
-          phone: phone,
-        );
-      });
-    } else {
-      setState(() {
-        _hasRegisteredUser = false;
-        _registeredUser = null;
-      });
-    }
-  }
-
-  String? _validateUsername(String? value) {
-    if (value == null || value.isEmpty) return 'Please enter your username';
-    if (value.length < 4) return 'Username too short';
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Please enter your password';
-    if (value.length < 6) return 'Password must be at least 6 characters';
-    return null;
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _loginUser() async {
@@ -116,8 +82,6 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('phone', credentials.phone);
 
       setState(() {
-        _hasRegisteredUser = true;
-        _registeredUser = credentials;
         usernameController.text = credentials.username;
         passwordController.text = credentials.password;
         _errorMessage = null;
@@ -134,143 +98,246 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final hintColor = isDark ? Colors.white70 : Colors.grey[600];
-
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const FlutterLogo(size: 100),
-              const SizedBox(height: 24),
-              Text(
-                'Welcome Back',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
-                textAlign: TextAlign.center,
+      body: Stack(
+        children: [
+          // Unique lively green gradient background with diagonal pattern
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFe8f5e9), // light mint
+                  Color(0xFFb2f7cc), // pastel green
+                  Color(0xFF43e97b), // vivid green
+                  Color(0xFF219150), // deep green
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to continue',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                      color: hintColor,
-                    ),
-                textAlign: TextAlign.center,
+            ),
+          ),
+          // Optional: subtle diagonal lines overlay for style
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _DiagonalPatternPainter(),
               ),
-              const SizedBox(height: 32),
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: usernameController,
-                      style: TextStyle(color: textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: TextStyle(color: hintColor),
-                        prefixIcon: Icon(Icons.person_outline, color: hintColor),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(36),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                  child: Container(
+                    width: 400,
+                    padding: const EdgeInsets.all(36),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(36),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.5),
+                        width: 2,
                       ),
-                      validator: _validateUsername,
-                      textInputAction: TextInputAction.next,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 32,
+                          offset: const Offset(0, 12),
+                        ),
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.18),
+                          blurRadius: 2,
+                          spreadRadius: 2,
+                          offset: const Offset(-2, -2),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: passwordController,
-                      style: TextStyle(color: textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: TextStyle(color: hintColor),
-                        prefixIcon: Icon(Icons.lock_outlined, color: hintColor),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: hintColor,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Your logo
+                          Image.asset(
+                            'assets/flutter_logo.png',
+                            height: 72,
+                            width: 72,
                           ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      validator: _validatePassword,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(height: 16),
+                          Text(
+                            'Welcome Back',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 24,
+                              color: Colors.black.withOpacity(0.85),
+                              shadows: [
+                                Shadow(
+                                  color: Colors.white.withOpacity(0.4),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _loginUser,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in to continue',
+                            style: TextStyle(
+                              color: Colors.black.withOpacity(0.55),
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: usernameController,
+                            decoration: InputDecoration(
+                              labelText: 'Username',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.92),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            )
-                          : const Text('SIGN IN'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Don't have an account?"),
-                  TextButton(
-                    onPressed: _navigateToRegister,
-                    child: const Text(
-                      'Register Now',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: const TextStyle(color: Color(0xFF2D3748)),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'Please enter your username';
+                              if (value.length < 4) return 'Username too short';
+                              return null;
+                            },
+                            textInputAction: TextInputAction.next,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: const Icon(Icons.lock_outlined),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(() => _obscurePassword = !_obscurePassword);
+                                },
+                              ),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.92),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            style: const TextStyle(color: Color(0xFF2D3748)),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'Please enter your password';
+                              if (value.length < 6) return 'Password must be at least 6 characters';
+                              return null;
+                            },
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                          ),
+                          const SizedBox(height: 12),
+                          if (_errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                backgroundColor: const Color(0xFF219150),
+                                shadowColor: Colors.transparent,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Sign in',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        letterSpacing: 0.5,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                              onPressed: _isLoading ? null : _loginUser,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Don't have an account?",
+                                style: TextStyle(
+                                  color: Colors.black.withOpacity(0.7),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _navigateToRegister,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF219150),
+                                  textStyle: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                child: const Text('Register now'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+}
+
+// Diagonal pattern painter for background style
+class _DiagonalPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..strokeWidth = 1;
+    for (double i = -size.height; i < size.width; i += 24) {
+      canvas.drawLine(
+        Offset(i, 0),
+        Offset(i + size.height, size.height),
+        paint,
+      );
+    }
+  }
 
   @override
-  void dispose() {
-    usernameController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
