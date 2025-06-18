@@ -42,16 +42,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> addNotification(String message) async {
-    final prefs = await SharedPreferences.getInstance();
-    final notifs = prefs.getStringList('notifications') ?? [];
-    notifs.insert(0, message);
-    await prefs.setStringList('notifications', notifs);
-    setState(() {
-      notifications = notifs;
-    });
-  }
-
   void _showNotifications(BuildContext context) async {
     await _loadNotifications();
     showDialog(
@@ -90,8 +80,15 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Profile"),
+        title: const Text("Money Manager"),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            tooltip: "Notifications",
+            onPressed: () => _showNotifications(context),
+          ),
+        ],
       ),
       drawer: _buildDrawer(context, theme),
       body: Container(

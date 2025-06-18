@@ -17,14 +17,12 @@ class _SettingsPageState extends State<SettingsPage> {
   String user = '';
   String password = '';
   bool _loading = true;
-  String language = 'en';
   List<String> notifications = [];
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
-    _loadLanguage();
     _loadNotifications();
   }
 
@@ -46,21 +44,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setString('password', password);
   }
 
-  Future<void> _loadLanguage() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      language = prefs.getString('language') ?? 'en';
-    });
-  }
-
-  Future<void> _saveLanguage(String lang) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('language', lang);
-    setState(() {
-      language = lang;
-    });
-  }
-
   Future<void> _loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
     final notif = prefs.getStringList('notifications');
@@ -71,8 +54,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _addNotification(String message) async {
     final prefs = await SharedPreferences.getInstance();
-    notifications.insert(0, message);
-    await prefs.setStringList('notifications', notifications);
+    final notifs = prefs.getStringList('notifications') ?? [];
+    notifs.insert(0, message);
+    await prefs.setStringList('notifications', notifs);
   }
 
   void _editField(
@@ -216,7 +200,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(language == 'ms' ? "Tetapan" : "Settings"),
+        title: Text("Settings"),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
@@ -269,7 +253,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Text(
-                language == 'ms' ? "AKAUN" : "ACCOUNT",
+                "ACCOUNT",
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -287,20 +271,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingsItem(
                     context,
                     icon: Icons.lock_outline,
-                    title: language == 'ms' ? "Tukar Kata Laluan" : "Change Password",
-                    subtitle: language == 'ms'
-                        ? "Kemas kini kata laluan anda"
-                        : "Update your login password",
+                    title: "Change Password",
+                    subtitle: "Update your login password",
                     showTrailing: true,
                     onTap: () {
                       _editField(
-                        language == 'ms' ? "Kata Laluan" : "Password",
+                        "Password",
                         password,
                         (val) {
                           password = val;
-                          _addNotification(language == 'ms'
-                              ? "Kata laluan berjaya ditukar"
-                              : "Password changed successfully");
+                          _addNotification("You have changed your password.");
                         },
                         isPassword: true,
                       );
@@ -310,18 +290,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingsItem(
                     context,
                     icon: Icons.email_outlined,
-                    title: language == 'ms' ? "Tukar Emel" : "Change Email",
+                    title: "Change Email",
                     subtitle: email,
                     showTrailing: true,
                     onTap: () {
                       _editField(
-                        language == 'ms' ? "Emel" : "Email",
+                        "Email",
                         email,
                         (val) {
                           email = val;
-                          _addNotification(language == 'ms'
-                              ? "Emel berjaya dikemaskini"
-                              : "Email updated successfully");
+                          _addNotification("You have changed your email.");
                         },
                       );
                     },
@@ -330,18 +308,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingsItem(
                     context,
                     icon: Icons.phone_android_outlined,
-                    title: language == 'ms' ? "Nombor Telefon" : "Phone Number",
+                    title: "Phone Number",
                     subtitle: phone,
                     showTrailing: true,
                     onTap: () {
                       _editField(
-                        language == 'ms' ? "Telefon" : "Phone",
+                        "Phone",
                         phone,
                         (val) {
                           phone = val;
-                          _addNotification(language == 'ms'
-                              ? "Nombor telefon berjaya dikemaskini"
-                              : "Phone number updated successfully");
+                          _addNotification("You have changed your phone number.");
                         },
                       );
                     },
@@ -355,7 +331,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Text(
-                language == 'ms' ? "TETAPAN APLIKASI" : "APP SETTINGS",
+                "APP SETTINGS",
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -373,10 +349,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingsItem(
                     context,
                     icon: Icons.palette_outlined,
-                    title: language == 'ms' ? "Tema" : "Theme",
-                    subtitle: isDarkMode
-                        ? (language == 'ms' ? "Mod Gelap" : "Dark Mode")
-                        : (language == 'ms' ? "Mod Cerah" : "Light Mode"),
+                    title: "Theme",
+                    subtitle: isDarkMode ? "Dark Mode" : "Light Mode",
                     showTrailing: false,
                     trailing: Switch(
                       value: isDarkMode,
@@ -389,57 +363,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildDivider(),
                   _buildSettingsItem(
                     context,
-                    icon: Icons.notifications_outlined,
-                    title: language == 'ms' ? "Notifikasi" : "Notifications",
-                    subtitle: language == 'ms'
-                        ? "Lihat notifikasi terkini"
-                        : "View recent notifications",
-                    showTrailing: true,
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text(language == 'ms'
-                              ? "Notifikasi"
-                              : "Notifications"),
-                          content: SizedBox(
-                            width: double.maxFinite,
-                            child: notifications.isEmpty
-                                ? Text(language == 'ms'
-                                    ? "Tiada notifikasi"
-                                    : "No notifications yet.")
-                                : ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: notifications.length,
-                                    itemBuilder: (context, index) => ListTile(
-                                      leading:
-                                          const Icon(Icons.notifications),
-                                      title: Text(notifications[index]),
-                                    ),
-                                  ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(language == 'ms'
-                                  ? "Tutup"
-                                  : "Close"),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  _buildDivider(),
-                  _buildSettingsItem(
-                    context,
                     icon: Icons.share_outlined,
-                    title: language == 'ms'
-                        ? "Kongsi dengan rakan"
-                        : "Tell your friends",
-                    subtitle: language == 'ms'
-                        ? "Kongsi aplikasi ini"
-                        : "Share this app",
+                    title: "Tell your friends",
+                    subtitle: "Share this app",
                     showTrailing: true,
                     onTap: () {},
                   ),
@@ -465,7 +391,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   onPressed: () {
                     _showLogoutConfirmation(context);
                   },
-                  child: Text(language == 'ms' ? "Log Keluar" : "Log Out"),
+                  child: Text("Log Out"),
                 ),
               ),
             ),

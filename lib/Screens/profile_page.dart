@@ -208,22 +208,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 32),
-            // Actions
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.logout),
-                label: const Text("Log Out"),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: theme.colorScheme.error),
-                  foregroundColor: theme.colorScheme.error,
-                ),
-                onPressed: () {
-                  _showLogoutConfirmation(context);
-                },
-              ),
-            ),
           ],
         ),
       ),

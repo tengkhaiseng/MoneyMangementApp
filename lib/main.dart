@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'Screens/theme_provider.dart';
 import 'Screens/login_page.dart'; // Change to your actual home page if needed
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(
@@ -82,8 +83,15 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Profile"),
+        title: const Text("Money Manager"),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            tooltip: "Notifications",
+            onPressed: () => _showNotifications(context),
+          ),
+        ],
       ),
       body: Center(
         child: Text("Profile Page Content\nUsername: $username"),
@@ -130,6 +138,51 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
+    );
+  }
+
+  // Dummy notifications list for demonstration
+  List<String> notifications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      notifications = prefs.getStringList('notifications') ?? [];
+    });
+  }
+
+  void _showNotifications(BuildContext context) async {
+    await _loadNotifications();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Notifications"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: notifications.isEmpty
+              ? const Text("No notifications yet.")
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) => ListTile(
+                    leading: const Icon(Icons.notifications),
+                    title: Text(notifications[index]),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
     );
   }
 }
