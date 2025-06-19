@@ -3,7 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-class BudgetPage extends StatefulWidget {
+class BudgetPage extends StatefulWidget { 
   final String language;
   const BudgetPage({super.key, required this.language, required Future<void> Function() onBudgetSaved});
 
